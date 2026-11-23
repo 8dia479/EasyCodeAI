@@ -105,3 +105,32 @@ func TestRunChecksDoesNotExecuteGoProjectWithoutPermission(t *testing.T) {
 		t.Fatalf("run_checks error = %v, want explicit permission error", err)
 	}
 }
+
+
+func TestRunChecksReportsUnsupportedLanguageWithoutClaimingSuccess(t *testing.T) {
+	registry, root := newTestRegistry(t, false, false)
+	if err := os.WriteFile(filepath.Join(root, "main.rs"), []byte("fn main() {}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := registry.Execute(context.Background(), "run_checks", "{}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "[checks-unavailable]") {
+		t.Fatalf("run_checks result = %q, want checks-unavailable marker", got)
+	}
+}
+
+func TestRunChecksMarksDocumentationOnlyWorkspaceAsChecked(t *testing.T) {
+	registry, root := newTestRegistry(t, false, false)
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("# Project\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := registry.Execute(context.Background(), "run_checks", "{}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "[checks-passed]") {
+		t.Fatalf("run_checks result = %q, want checks-passed marker", got)
+	}
+}
