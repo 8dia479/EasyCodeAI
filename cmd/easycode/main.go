@@ -22,12 +22,16 @@ func main() {
 	var root string
 	var resume bool
 	var maxRounds int
+	var allowProjectExecution bool
+	var allowOverwrite bool
 	flag.StringVar(&prompt, "prompt", "", "task to give the coding agent")
 	flag.StringVar(&model, "model", os.Getenv("NIM_MODEL"), "NVIDIA NIM model ID")
 	flag.StringVar(&baseURL, "base-url", os.Getenv("NIM_BASE_URL"), "OpenAI-compatible NIM base URL")
 	flag.StringVar(&root, "workspace", os.Getenv("EASYCODE_WORKSPACE"), "project workspace")
 	flag.BoolVar(&resume, "resume", false, "resume the saved task for this workspace")
 	flag.IntVar(&maxRounds, "max-rounds", 20, "maximum model rounds per invocation (1-200)")
+	flag.BoolVar(&allowProjectExecution, "allow-project-execution", false, "allow Go tests/build to execute code from the workspace")
+	flag.BoolVar(&allowOverwrite, "allow-overwrite", false, "allow the agent to replace existing workspace files")
 	flag.Parse()
 
 	if maxRounds < 1 || maxRounds > 200 {
@@ -55,7 +59,7 @@ func main() {
 		fatal(err)
 	}
 	client := nim.NewClient(baseURL, apiKey, model)
-	engine := agent.New(client, ws, agent.Options{MaxRounds: maxRounds})
+	engine := agent.New(client, ws, agent.Options{MaxRounds: maxRounds, AllowProjectExecution: allowProjectExecution, AllowFileOverwrite: allowOverwrite})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -77,7 +81,10 @@ func main() {
 		return
 	}
 
-	fmt.Println("EasyCodeAI Alpha0.1 — /resume restores the saved task, /status shows it, /exit quits.")
+	fmt.Println("EasyCodeAI — /resume restores the saved task, /status shows it, /exit quits.")
+	if !allowOverwrite || !allowProjectExecution {
+		fmt.Println("Safe mode: existing-file replacement and Go project execution are disabled unless enabled with CLI flags.")
+	}
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("\n easycode > ")
