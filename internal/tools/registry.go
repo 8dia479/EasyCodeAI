@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -326,10 +327,11 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 	})
 	if len(pythonFiles) > 0 {
 		script := "import ast,pathlib,sys; files=[pathlib.Path(p) for p in sys.argv[1:]]; [(ast.parse(p.read_text(encoding='utf-8'), filename=str(p))) for p in files]"
-		output, err := runBounded(ctx, r.ws.Root, "python3", append([]string{"-c", script}, pythonFiles...)...)
-		if err != nil {
-			output, err = runBounded(ctx, r.ws.Root, "python", append([]string{"-c", script}, pythonFiles...)...)
+		python := "python"
+		if _, err := exec.LookPath("python3"); err == nil {
+			python = "python3"
 		}
+		output, err := runBounded(ctx, r.ws.Root, python, append([]string{"-c", script}, pythonFiles...)...)
 		fmt.Fprintf(&result, "$ python syntax check (%d files)\n%s\n", len(pythonFiles), output)
 		if err != nil {
 			return result.String(), fmt.Errorf("Python syntax check failed or Python is unavailable: %w", err)
@@ -337,7 +339,7 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 	}
 	if len(jsFiles) > 0 {
 		for _, path := range jsFiles {
-			output, err := runBounded(ctx, r.ws.Root, "node", "--check", path)
+			output, err := runBounded(ctx, r.ws.Root, "node", "--check", "./"+filepath.ToSlash(path))
 			fmt.Fprintf(&result, "$ node --check %s\n%s\n", path, output)
 			if err != nil {
 				return result.String(), fmt.Errorf("JavaScript syntax check failed or Node.js is unavailable: %w", err)
