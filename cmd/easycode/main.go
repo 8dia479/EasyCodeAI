@@ -21,13 +21,19 @@ func main() {
 	var baseURL string
 	var root string
 	var resume bool
+	var maxRounds int
 	flag.StringVar(&prompt, "prompt", "", "task to give the coding agent")
 	flag.StringVar(&model, "model", os.Getenv("NIM_MODEL"), "NVIDIA NIM model ID")
 	flag.StringVar(&baseURL, "base-url", os.Getenv("NIM_BASE_URL"), "OpenAI-compatible NIM base URL")
 	flag.StringVar(&root, "workspace", os.Getenv("EASYCODE_WORKSPACE"), "project workspace")
 	flag.BoolVar(&resume, "resume", false, "resume the saved task for this workspace")
+	flag.IntVar(&maxRounds, "max-rounds", 20, "maximum model rounds per invocation (1-200)")
 	flag.Parse()
 
+	if maxRounds < 1 || maxRounds > 200 {
+		fmt.Fprintln(os.Stderr, "--max-rounds must be between 1 and 200")
+		os.Exit(2)
+	}
 	if root == "" {
 		root, _ = os.Getwd()
 	}
@@ -49,7 +55,7 @@ func main() {
 		fatal(err)
 	}
 	client := nim.NewClient(baseURL, apiKey, model)
-	engine := agent.New(client, ws, agent.Options{})
+	engine := agent.New(client, ws, agent.Options{MaxRounds: maxRounds})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
