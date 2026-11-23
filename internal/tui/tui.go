@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -18,6 +19,7 @@ type Engine interface {
 }
 
 type outputMsg string
+type programSender struct{ p *tea.Program }
 type taskDoneMsg struct{ err error }
 
 type streamWriter struct{ send func(tea.Msg) }
@@ -31,7 +33,7 @@ func (w streamWriter) Write(p []byte) (int, error) {
 
 type model struct {
 	engine    Engine
-	program   *tea.Program
+	sender    *programSender
 	workspace string
 	modelName string
 	input     []rune
@@ -54,7 +56,7 @@ var (
 )
 
 func Run(engine Engine, workspace, modelName string) error {
-	m := model{
+	sender := &programSender{}\n\tm := model{\n\t\tsender: sender,
 		engine: engine, workspace: workspace, modelName: modelName,
 		width: 80, height: 24,
 		logs: []string{
@@ -63,7 +65,7 @@ func Run(engine Engine, workspace, modelName string) error {
 		},
 	}
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
-	m.program = p
+	sender.p = p
 	_, err := p.Run()
 	return err
 }
@@ -81,7 +83,7 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.cancel = nil
 		m.stopping = false
 		if msg.err != nil {
-			if msg.err == context.Canceled {
+			if errors.Is(msg.err, context.Canceled) {
 				m.appendLog("\n[interrupted] Task cancelled. Checkpoint saved when interruption was observed. Use /resume to continue.")
 			} else {
 				m.appendLog("\n[task stopped] " + msg.err.Error())
@@ -199,7 +201,7 @@ func (m *model) startTask(prompt string, resume bool) tea.Cmd {
 		m.appendLog("\n" + userStyle.Render("You") + "\n" + prompt + "\n")
 	}
 	return func() tea.Msg {
-		writer := streamWriter{send: func(msg tea.Msg) { m.program.Send(msg) }}
+		writer := streamWriter{send: func(msg tea.Msg) { m.sender.p.Send(msg) }}
 		var err error
 		if resume {
 			err = m.engine.Resume(ctx, writer)
