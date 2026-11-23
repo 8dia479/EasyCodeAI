@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -108,6 +109,54 @@ func (w *Workspace) ReadFile(name string) (string, error) {
 		return string(data[:maxReadSize]) + "\n[truncated at 1 MiB]", nil
 	}
 	return string(data), nil
+}
+
+
+func (w *Workspace) ReadFileLines(name string, startLine, endLine int) (string, error) {
+	const (
+		maxLines = 1000
+		maxBytes = 1 << 20
+	)
+	if startLine < 1 || endLine < startLine || endLine-startLine+1 > maxLines {
+		return "", fmt.Errorf("line range must be within 1-%d lines", maxLines)
+	}
+	path, err := w.Resolve(name)
+	if err != nil {
+		return "", err
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("refusing to read non-regular file: %s", name)
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), 1<<20)
+	var result strings.Builder
+	for lineNo := 1; scanner.Scan(); lineNo++ {
+		if lineNo > endLine {
+			break
+		}
+		if lineNo < startLine {
+			continue
+		}
+		line := scanner.Text() + "\n"
+		if result.Len()+len(line) > maxBytes {
+			result.WriteString("[range output truncated at 1 MiB]\n")
+			break
+		}
+		result.WriteString(line)
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return result.String(), nil
 }
 
 func (w *Workspace) WriteFile(name, content string) error {
