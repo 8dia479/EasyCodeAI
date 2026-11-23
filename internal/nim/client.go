@@ -273,3 +273,6 @@ func retryDelay(retryAfter string, attempt int) (time.Duration, bool) {
 	}
 	return delay, true
 }
+
+// SetModel changes the model used by subsequent requests.
+func (c *Client) SetModel(model string) { c.model = model }
