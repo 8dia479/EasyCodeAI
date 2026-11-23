@@ -183,7 +183,11 @@ func (a *Agent) executePendingTools(ctx context.Context, cp *Checkpoint, out io.
 			result = "TOOL ERROR: " + toolErr.Error()
 		}
 		if call.Function.Name == "run_checks" && toolErr != nil {
-			cp.Verification = "failed"
+			if strings.Contains(toolErr.Error(), "--allow-project-execution") {
+				cp.Verification = "unavailable"
+			} else {
+				cp.Verification = "failed"
+			}
 		}
 		if toolErr == nil {
 			switch call.Function.Name {
