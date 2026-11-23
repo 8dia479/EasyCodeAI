@@ -35,3 +35,22 @@ func TestSafeGoEnvExcludesNIMCredentials(t *testing.T) {
 		t.Fatal("safe project environment is missing PATH")
 	}
 }
+
+func TestManifestLanguage(t *testing.T) {
+	tests := map[string]string{
+		"go.mod": "Go", "go.work": "Go", "Cargo.toml": "Rust",
+		"pom.xml": "Java", "build.gradle.kts": "Java",
+		"pyproject.toml": "Python", "package.json": "JavaScript",
+		"Example.csproj": "C#", "Example.sln": "C#", "Example.slnx": "C#",
+		"Example.fsproj": "F#", "Example.vbproj": "Visual Basic",
+	}
+	for name, want := range tests {
+		got, ok := manifestLanguage(name)
+		if !ok || got != want {
+			t.Errorf("manifestLanguage(%q) = (%q, %v), want (%q, true)", name, got, ok, want)
+		}
+	}
+	if got, ok := manifestLanguage("README.md"); ok {
+		t.Errorf("manifestLanguage(README.md) = (%q, true), want no match", got)
+	}
+}
