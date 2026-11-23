@@ -70,10 +70,16 @@ easycode --workspace . --model "$NIM_MODEL" --allow-overwrite --allow-project-ex
 
 - `list_files` — list workspace entries
 - `read_file` — read a workspace file
-- `write_file` — create or replace a workspace file
-- `inspect_project` — detect project languages and common manifests without executing project code\n- `search_files` — bounded case-insensitive source search, skipping dependency/build folders\n- `run_checks` — Python AST and JavaScript syntax checks; Go test/vet/build only when explicitly enabled
+- `write_file` — create or replace a workspace file (existing-file replacement requires `--allow-overwrite`)
+- `inspect_project` — detect project languages and common manifests without executing project code
+- `search_files` — bounded case-insensitive source search, skipping dependency/build folders
+- `run_checks` — Python AST and JavaScript syntax checks; Go test/vet/build only when explicitly enabled
 
-Use `--max-rounds N` (1–200) to set the model-round budget for each invocation; `/resume` or `--resume` continues the same task with a fresh budget.\n\nThe shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands, each with a five-minute timeout and a 1 MiB output cap.\n\nIn interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
+Use `--max-rounds N` (1–200) to set the model-round budget for each invocation; `/resume` or `--resume` continues the same task with a fresh budget.
+
+The model does not receive arbitrary shell access. Python and JavaScript checks are syntax-only; Go tests/build can execute project code and require `--allow-project-execution`. All verification subprocesses have a five-minute timeout and a 1 MiB output cap.
+
+In interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
 
 ## OpenCode reference
 
