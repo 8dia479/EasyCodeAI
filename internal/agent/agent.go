@@ -115,6 +115,16 @@ func (a *Agent) runLoop(ctx context.Context, cp Checkpoint, out io.Writer) error
 		}
 
 		if strings.Contains(reply.Content, "<easycode-done>") {
+			if !canComplete(cp) {
+				cp.Messages = append(cp.Messages, nim.Message{
+					Role: "user",
+					Content: "You modified project files but have not run the available verification checks successfully. Call run_checks now. If the project has no supported checks, report that limitation accurately; do not claim tests passed.",
+				})
+				if err := saveCheckpoint(cp); err != nil {
+					return err
+				}
+				continue
+			}
 			cp.Phase = "completed"
 			cp.History = append(cp.History, "completed")
 			return saveCheckpoint(cp)
@@ -172,6 +182,22 @@ func (a *Agent) executePendingTools(ctx context.Context, cp *Checkpoint, out io.
 		if toolErr != nil {
 			result = "TOOL ERROR: " + toolErr.Error()
 		}
+		if toolErr == nil {
+			switch call.Function.Name {
+			case "write_file":
+				cp.Modified = true
+				cp.Verification = "not-run"
+			case "run_checks":
+				switch {
+				case strings.HasPrefix(result, "[checks-passed]"):
+					cp.Verification = "passed"
+				case strings.HasPrefix(result, "[checks-unavailable]"):
+					cp.Verification = "unavailable"
+				default:
+					cp.Verification = "failed"
+				}
+			}
+		}
 		cp.Messages = append(cp.Messages, nim.Message{
 			Role:       "tool",
 			ToolCallID: call.ID,
@@ -184,6 +210,10 @@ func (a *Agent) executePendingTools(ctx context.Context, cp *Checkpoint, out io.
 		fmt.Fprintln(out, result)
 	}
 	return nil
+}
+
+func canComplete(cp Checkpoint) bool {
+	return !cp.Modified || cp.Verification == "passed" || cp.Verification == "unavailable"
 }
 
 func truncate(s string, n int) string {
