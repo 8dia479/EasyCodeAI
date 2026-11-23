@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -29,10 +30,10 @@ func TestCompleteEmitsNonStreamingContent(t *testing.T) {
 
 
 func TestCompleteRetriesRateLimitedRequest(t *testing.T) {
-	attempts := 0
+	var attempts atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attempts++
-		if attempts == 1 {
+		attempts.Add(1)
+		if attempts.Load() == 1 {
 			w.Header().Set("Retry-After", "0")
 			http.Error(w, "queued", http.StatusTooManyRequests)
 			return
@@ -50,8 +51,8 @@ func TestCompleteRetriesRateLimitedRequest(t *testing.T) {
 	if msg.Content != "recovered" {
 		t.Fatalf("content = %q, want recovered", msg.Content)
 	}
-	if attempts != 2 {
-		t.Fatalf("request attempts = %d, want 2", attempts)
+	if got := attempts.Load(); got != 2 {
+		t.Fatalf("request attempts = %d, want 2", got)
 	}
 }
 
@@ -94,9 +95,9 @@ func TestCompletePreservesSparseToolCallIndices(t *testing.T) {
 }
 
 func TestCompleteRejectsOversizedRequestBeforeNetwork(t *testing.T) {
-	called := false
+	var called atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
+		called.Store(true)
 	}))
 	defer server.Close()
 
@@ -105,7 +106,7 @@ func TestCompleteRejectsOversizedRequestBeforeNetwork(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "16 MiB") {
 		t.Fatalf("Complete() error = %v, want request size limit", err)
 	}
-	if called {
+	if called.Load() {
 		t.Fatal("oversized request unexpectedly reached the server")
 	}
 }
