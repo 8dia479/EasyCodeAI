@@ -168,7 +168,7 @@ func (b *limitedBuffer) String() string {
 
 	result := b.buf.String()
 	if b.truncated {
-		result += "\n[output truncated at 1 MiB]"
+		result += fmt.Sprintf("\n[output truncated at %d bytes]", b.max)
 	}
 	return result
 }
