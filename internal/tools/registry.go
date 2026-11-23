@@ -205,7 +205,7 @@ func intArgument(input map[string]any, name string, defaultValue int) (int, erro
 		return defaultValue, nil
 	}
 	number, ok := value.(float64)
-	if !ok || number < 1 || number > 1_000_000_000 || number != float64(int(number)) {
+	if !ok || number < 1 || number > 10_000_000 || number != float64(int(number)) {
 		return 0, fmt.Errorf("%s must be a positive integer", name)
 	}
 	return int(number), nil
