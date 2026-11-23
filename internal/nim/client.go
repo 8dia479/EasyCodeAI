@@ -1,33 +1,246 @@
 package nim
 
 import (
- "bufio"
- "bytes"
- "context"
- "encoding/json"
- "fmt"
- "io"
- "net/http"
- "strings"
- "time"
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
-type ToolCall struct { ID string `json:"id"`; Type string `json:"type"`; Function ToolFunction `json:"function"` }
-type ToolFunction struct { Name string `json:"name"`; Arguments string `json:"arguments"` }
-type Message struct { Role string `json:"role"`; Content string `json:"content"`; ToolCalls []ToolCall `json:"tool_calls,omitempty"`; ToolCallID string `json:"tool_call_id,omitempty"` }
-type ToolSpec struct { Type string `json:"type"`; Function ToolFunctionSpec `json:"function"` }
-type ToolFunctionSpec struct { Name string `json:"name"`; Description string `json:"description"`; Parameters any `json:"parameters"` }
-type Client struct { baseURL, apiKey, model string; http *http.Client }
-func NewClient(baseURL, apiKey, model string)*Client{return &Client{strings.TrimRight(baseURL,"/"),apiKey,model,&http.Client{Timeout:0,Transport:&http.Transport{ResponseHeaderTimeout:90*time.Second}}}}
-type request struct { Model string `json:"model"`; Messages []Message `json:"messages"`; Stream bool `json:"stream"`; Temperature float64 `json:"temperature,omitempty"`; MaxTokens int `json:"max_tokens,omitempty"`; Tools []ToolSpec `json:"tools,omitempty"`; ToolChoice string `json:"tool_choice,omitempty"` }
-type response struct { Choices []struct{Message Message `json:"message"`} `json:"choices"` }
-type chunk struct { Choices []struct{Delta struct{Content string `json:"content"`; ToolCalls []struct{Index int `json:"index"`; ID string `json:"id"`; Type string `json:"type"`; Function struct{Name string `json:"name"`; Arguments string `json:"arguments"`} `json:"function"`} `json:"tool_calls"`} `json:"delta"`} `json:"choices"` }
-func(c *Client)Complete(ctx context.Context,messages []Message,tools []ToolSpec,onDelta func(string))(Message,error){
- b,e:=json.Marshal(request{c.model,messages,true,0.2,8192,tools,"auto"});if e!=nil{return Message{},e}
- req,e:=http.NewRequestWithContext(ctx,http.MethodPost,c.baseURL+"/chat/completions",bytes.NewReader(b));if e!=nil{return Message{},e};req.Header.Set("Authorization","Bearer "+c.apiKey);req.Header.Set("Content-Type","application/json");req.Header.Set("Accept","text/event-stream")
- resp,e:=c.http.Do(req);if e!=nil{return Message{},fmt.Errorf("NIM request failed: %w",e)};defer resp.Body.Close();if resp.StatusCode<200||resp.StatusCode>=300{data,_:=io.ReadAll(io.LimitReader(resp.Body,1<<20));return Message{},fmt.Errorf("NIM HTTP %d: %s",resp.StatusCode,strings.TrimSpace(string(data)))}
- if !strings.Contains(resp.Header.Get("Content-Type"),"text/event-stream"){var v response;if e=json.NewDecoder(resp.Body).Decode(&v);e!=nil{return Message{},e};if len(v.Choices)==0{return Message{},fmt.Errorf("empty NIM response")};msg:=v.Choices[0].Message;if msg.Role==""{msg.Role="assistant"};if msg.Content!=""&&onDelta!=nil{onDelta(msg.Content)};return msg,nil}
- var out Message;calls:=map[int]*ToolCall{};sc:=bufio.NewScanner(resp.Body);sc.Buffer(make([]byte,65536),4*1024*1024)
- for sc.Scan(){line:=strings.TrimSpace(sc.Text());if !strings.HasPrefix(line,"data:"){continue};p:=strings.TrimSpace(strings.TrimPrefix(line,"data:"));if p=="[DONE]"{break};var v chunk;if e=json.Unmarshal([]byte(p),&v);e!=nil{return out,e};if len(v.Choices)==0{continue};d:=v.Choices[0].Delta;if d.Content!=""{out.Content+=d.Content;if onDelta!=nil{onDelta(d.Content)}};for _,part:=range d.ToolCalls{tc:=calls[part.Index];if tc==nil{tc=&ToolCall{Type:"function"};calls[part.Index]=tc};if part.ID!=""{tc.ID=part.ID};if part.Type!=""{tc.Type=part.Type};tc.Function.Name+=part.Function.Name;tc.Function.Arguments+=part.Function.Arguments}}
- if e=sc.Err();e!=nil{return out,e};for i:=0;i<len(calls);i++{if tc:=calls[i];tc!=nil{out.ToolCalls=append(out.ToolCalls,*tc)}};out.Role="assistant";if out.Content==""&&len(out.ToolCalls)==0{return out,fmt.Errorf("empty NIM stream")};return out,nil
+type ToolCall struct {
+	ID       string       `json:"id"`
+	Type     string       `json:"type"`
+	Function ToolFunction `json:"function"`
+}
+
+type ToolFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+type Message struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+}
+
+type ToolSpec struct {
+	Type     string           `json:"type"`
+	Function ToolFunctionSpec `json:"function"`
+}
+
+type ToolFunctionSpec struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Parameters  any    `json:"parameters"`
+}
+
+type Client struct {
+	baseURL string
+	apiKey  string
+	model   string
+	http    *http.Client
+}
+
+func NewClient(baseURL, apiKey, model string) *Client {
+	return &Client{
+		baseURL: strings.TrimRight(baseURL, "/"),
+		apiKey:  apiKey,
+		model:   model,
+		http: &http.Client{Timeout: 0, Transport: &http.Transport{
+			ResponseHeaderTimeout: 90 * time.Second,
+		}},
+	}
+}
+
+type request struct {
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Stream      bool      `json:"stream"`
+	Temperature float64   `json:"temperature,omitempty"`
+	MaxTokens   int       `json:"max_tokens,omitempty"`
+	Tools       []ToolSpec `json:"tools,omitempty"`
+	ToolChoice  string    `json:"tool_choice,omitempty"`
+}
+
+type response struct {
+	Choices []struct {
+		Message Message `json:"message"`
+	} `json:"choices"`
+}
+
+type chunk struct {
+	Choices []struct {
+		Delta struct {
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
+		} `json:"delta"`
+	} `json:"choices"`
+}
+
+const maxRequestAttempts = 4
+
+func (c *Client) Complete(ctx context.Context, messages []Message, tools []ToolSpec, onDelta func(string)) (Message, error) {
+	body, err := json.Marshal(request{c.model, messages, true, 0.2, 8192, tools, "auto"})
+	if err != nil {
+		return Message{}, err
+	}
+
+	var resp *http.Response
+	for attempt := 0; attempt < maxRequestAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
+		if err != nil {
+			return Message{}, err
+		}
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "text/event-stream")
+
+		resp, err = c.http.Do(req)
+		if err != nil {
+			return Message{}, fmt.Errorf("NIM request failed: %w", err)
+		}
+		if !isRetryableStatus(resp.StatusCode) || attempt == maxRequestAttempts-1 {
+			break
+		}
+
+		delay := retryDelay(resp.Header.Get("Retry-After"), attempt)
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+		_ = resp.Body.Close()
+		select {
+		case <-ctx.Done():
+			return Message{}, ctx.Err()
+		case <-time.After(delay):
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return Message{}, fmt.Errorf("NIM HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
+	}
+
+	if !strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+		var value response
+		if err := json.NewDecoder(resp.Body).Decode(&value); err != nil {
+			return Message{}, err
+		}
+		if len(value.Choices) == 0 {
+			return Message{}, fmt.Errorf("empty NIM response")
+		}
+		msg := value.Choices[0].Message
+		if msg.Role == "" {
+			msg.Role = "assistant"
+		}
+		if msg.Content != "" && onDelta != nil {
+			onDelta(msg.Content)
+		}
+		return msg, nil
+	}
+
+	var out Message
+	calls := map[int]*ToolCall{}
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 65536), 4*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "[DONE]" {
+			break
+		}
+		var value chunk
+		if err := json.Unmarshal([]byte(payload), &value); err != nil {
+			return out, err
+		}
+		if len(value.Choices) == 0 {
+			continue
+		}
+		delta := value.Choices[0].Delta
+		if delta.Content != "" {
+			out.Content += delta.Content
+			if onDelta != nil {
+				onDelta(delta.Content)
+			}
+		}
+		for _, part := range delta.ToolCalls {
+			call := calls[part.Index]
+			if call == nil {
+				call = &ToolCall{Type: "function"}
+				calls[part.Index] = call
+			}
+			if part.ID != "" {
+				call.ID = part.ID
+			}
+			if part.Type != "" {
+				call.Type = part.Type
+			}
+			call.Function.Name += part.Function.Name
+			call.Function.Arguments += part.Function.Arguments
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return out, err
+	}
+	for i := 0; i < len(calls); i++ {
+		if call := calls[i]; call != nil {
+			out.ToolCalls = append(out.ToolCalls, *call)
+		}
+	}
+	out.Role = "assistant"
+	if out.Content == "" && len(out.ToolCalls) == 0 {
+		return out, fmt.Errorf("empty NIM stream")
+	}
+	return out, nil
+}
+
+func isRetryableStatus(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
+func retryDelay(retryAfter string, attempt int) time.Duration {
+	if seconds, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && seconds >= 0 {
+		delay := time.Duration(seconds) * time.Second
+		if delay > 30*time.Second {
+			return 30 * time.Second
+		}
+		return delay
+	}
+	if when, err := http.ParseTime(retryAfter); err == nil {
+		delay := time.Until(when)
+		if delay < 0 {
+			return 0
+		}
+		if delay > 30*time.Second {
+			return 30 * time.Second
+		}
+		return delay
+	}
+	delay := time.Duration(1<<attempt) * time.Second
+	if delay > 8*time.Second {
+		return 8 * time.Second
+	}
+	return delay
 }
