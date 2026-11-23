@@ -51,12 +51,13 @@ var (
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86")).Padding(0, 1)
 	mutedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	userStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))
-	errorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 	inputStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 )
 
 func Run(engine Engine, workspace, modelName string) error {
-	sender := &programSender{}\n\tm := model{\n\t\tsender: sender,
+	sender := &programSender{}
+	m := model{
+		sender: sender,
 		engine: engine, workspace: workspace, modelName: modelName,
 		width: 80, height: 24,
 		logs: []string{
