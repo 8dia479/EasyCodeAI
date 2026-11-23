@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -201,6 +201,9 @@ func (c *Client) Complete(ctx context.Context, messages []Message, tools []ToolS
 		for _, part := range delta.ToolCalls {
 			call := calls[part.Index]
 			if call == nil {
+				if len(calls) >= 64 {
+					return out, fmt.Errorf("NIM response contains more than 64 tool calls")
+				}
 				call = &ToolCall{Type: "function"}
 				calls[part.Index] = call
 			}
