@@ -87,3 +87,38 @@ func TestCanCompleteRequiresChecksAfterModifications(t *testing.T) {
 		})
 	}
 }
+
+
+func TestRunDoesNotOverwriteUnfinishedSession(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EASYCODE_STATE_DIR", dir)
+	projectDir := t.TempDir()
+	ws, err := workspace.New(projectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp := Checkpoint{
+		Task: "important unfinished task",
+		Workspace: ws.Root,
+		Phase: "interrupted",
+		Messages: []nim.Message{
+			{Role: "system", Content: "system"},
+			{Role: "user", Content: "important unfinished task"},
+		},
+	}
+	if err := saveCheckpoint(cp); err != nil {
+		t.Fatal(err)
+	}
+	engine := New(nil, ws, Options{})
+	err = engine.Run(context.Background(), "new task", &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "unfinished task") {
+		t.Fatalf("Run() error = %v, want unfinished-session protection", err)
+	}
+	saved, err := loadCheckpoint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Task != "important unfinished task" {
+		t.Fatalf("saved task was overwritten: %q", saved.Task)
+	}
+}
