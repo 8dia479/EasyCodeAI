@@ -20,7 +20,7 @@
 - Added context compaction that preserves the original task and avoids cutting through pending tool-call turns.
 - Added verification-state tracking: edits must be checked or explicitly reported as uncheckable before task completion.
 - Added a Termux installer, Makefile targets, secret/binary ignore rules, and a local `--doctor` diagnostic that does not contact NIM.
-- Added explicit `--allow-overwrite` and `--allow-project-execution` permissions; Go tests/build are unavailable unless explicitly enabled.
+- Added explicit `--allow-overwrite` and `--allow-project-execution` permissions; Go tests/build are unavailable unless explicitly enabled.\n- Existing files are backed up with owner-only permissions before allowed replacement; backups are kept per session and limited to 16 MiB per file.
 - Added request/response size limits and a 15-minute overall NIM request timeout; sparse SSE tool-call indices are preserved.
 
 ### Verification state
