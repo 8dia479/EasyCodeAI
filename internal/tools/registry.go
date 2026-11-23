@@ -260,17 +260,13 @@ func (r *Registry) searchFiles(ctx context.Context, query string) (string, error
 		if err != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 {
 			return nil
 		}
-		file, err := os.Open(path)
-		if err != nil {
-			return nil
-		}
-		data, readErr := io.ReadAll(io.LimitReader(file, (1<<20)+1))
-		_ = file.Close()
-		if readErr != nil || len(data) > 1<<20 || bytes.IndexByte(data, 0) >= 0 {
-			return nil
-		}
 		rel, err := filepath.Rel(r.ws.Root, path)
 		if err != nil {
+			return nil
+		}
+		value, readErr := r.ws.ReadFile(rel)
+		data := []byte(value)
+		if readErr != nil || bytes.IndexByte(data, 0) >= 0 {
 			return nil
 		}
 		for lineNo, line := range strings.Split(string(data), "\n") {
