@@ -163,6 +163,7 @@ func (r *Registry) inspectProject() (string, error) {
 	manifests := []string{
 		"go.mod", "go.work", "package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json",
 		"pyproject.toml", "requirements.txt", "Pipfile", "Cargo.toml", "pom.xml", "build.gradle",
+		"composer.json", "Gemfile", "Package.swift", "pubspec.yaml", "mix.exs",
 		"build.gradle.kts", "settings.gradle", "settings.gradle.kts", "*.sln", "*.csproj",
 		"CMakeLists.txt", "Makefile",
 	}
@@ -217,6 +218,24 @@ func (r *Registry) inspectProject() (string, error) {
 			languages["C/C++"] = true
 		case ".cs":
 			languages["C#"] = true
+		case ".html", ".htm":
+			languages["HTML"] = true
+		case ".css", ".scss", ".sass":
+			languages["CSS"] = true
+		case ".php":
+			languages["PHP"] = true
+		case ".rb":
+			languages["Ruby"] = true
+		case ".swift":
+			languages["Swift"] = true
+		case ".dart":
+			languages["Dart"] = true
+		case ".scala":
+			languages["Scala"] = true
+		case ".lua":
+			languages["Lua"] = true
+		case ".sh", ".bash":
+			languages["Shell"] = true
 		}
 		return nil
 	})
