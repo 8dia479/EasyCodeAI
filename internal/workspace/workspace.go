@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,13 +83,29 @@ func resolveExistingPrefix(path string) (string, error) {
 }
 
 func (w *Workspace) ReadFile(name string) (string, error) {
+	const maxReadSize = 1 << 20
 	path, err := w.Resolve(name)
 	if err != nil {
 		return "", err
 	}
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return "", err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("refusing to read non-regular file: %s", name)
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxReadSize+1))
+	if err != nil {
+		return "", err
+	}
+	if len(data) > maxReadSize {
+		return string(data[:maxReadSize]) + "\n[truncated at 1 MiB]", nil
 	}
 	return string(data), nil
 }
