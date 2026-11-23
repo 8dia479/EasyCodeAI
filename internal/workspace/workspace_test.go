@@ -69,3 +69,48 @@ func TestResolveRejectsFileSymlinkEscape(t *testing.T) {
 		t.Fatal("file symlink escape was allowed")
 	}
 }
+
+
+func TestWriteFilePreservesModeAndReplacesContents(t *testing.T) {
+	root := t.TempDir()
+	ws, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "existing.txt")
+	if err := os.WriteFile(path, []byte("old"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := ws.WriteFile("existing.txt", "new content"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "new content" {
+		t.Fatalf("contents = %q, want new content", data)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o750 {
+		t.Fatalf("mode = %o, want 750", info.Mode().Perm())
+	}
+}
+
+func TestWriteFileRejectsOversizedContent(t *testing.T) {
+	root := t.TempDir()
+	ws, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = ws.WriteFile("too-large.txt", strings.Repeat("x", (4<<20)+1))
+	if err == nil {
+		t.Fatal("oversized file write unexpectedly succeeded")
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "too-large.txt")); !os.IsNotExist(statErr) {
+		t.Fatalf("oversized file exists or stat failed unexpectedly: %v", statErr)
+	}
+}
