@@ -85,7 +85,7 @@ Omit `--allow-overwrite` to prevent replacement of existing files. Omit `--allow
 ## Current tools
 
 - `list_files` — list workspace entries
-- `read_file` — read a workspace file
+- `read_file` — read a workspace file (up to 1 MiB) or a bounded line range in larger files
 - `write_file` — create or replace a workspace file (existing-file replacement requires `--allow-overwrite`)
 - `inspect_project` — detect project languages and common manifests without executing project code
 - `search_files` — bounded case-insensitive source search, skipping dependency/build folders
@@ -93,7 +93,7 @@ Omit `--allow-overwrite` to prevent replacement of existing files. Omit `--allow
 
 Use `--max-rounds N` (1–200) to set the model-round budget for each invocation; `/resume` or `--resume` continues the same task with a fresh budget.
 
-The model does not receive arbitrary shell access. Existing files are backed up under the EasyCodeAI state directory before an allowed replacement (up to 16 MiB per source file). Python and JavaScript checks are syntax-only; Go tests/build can execute project code and require `--allow-project-execution`. All verification subprocesses have a five-minute timeout and a 1 MiB output cap.
+The model does not receive arbitrary shell access. Existing files are backed up under the EasyCodeAI state directory before an allowed replacement (up to 16 MiB per source file). Large files can be inspected in line ranges of up to 1000 lines per call. Python and JavaScript checks are syntax-only; Go tests/build can execute project code and require `--allow-project-execution`. All verification subprocesses have a five-minute timeout and a 1 MiB output cap.
 
 In interactive mode, `/resume` restores the saved conversation, `/status` displays the current session, and `/help` lists commands. Checkpoints are stored with owner-only file permissions. The default session uses `checkpoint.json`; named sessions use isolated files under `sessions/`, allowing separate projects/tasks to be resumed independently. Select the same `--session` name to resume a task later. A saved task can only resume in its original workspace.
 
