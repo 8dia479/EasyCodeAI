@@ -140,3 +140,36 @@ func TestReadFileCapsLargeFiles(t *testing.T) {
 		t.Fatalf("read result unexpectedly exceeds cap: %d bytes", len(got))
 	}
 }
+
+
+func TestReadFileLinesReturnsRequestedRange(t *testing.T) {
+	root := t.TempDir()
+	ws, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "lines.txt"), []byte("one\ntwo\nthree\nfour\nfive\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ws.ReadFileLines("lines.txt", 2, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "two\nthree\nfour\n" {
+		t.Fatalf("ReadFileLines() = %q, want requested lines", got)
+	}
+}
+
+func TestReadFileLinesRejectsUnboundedRanges(t *testing.T) {
+	root := t.TempDir()
+	ws, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ws.ReadFileLines("missing.txt", 1, 1001); err == nil {
+		t.Fatal("ReadFileLines accepted a range larger than 1000 lines")
+	}
+	if _, err := ws.ReadFileLines("missing.txt", 0, 10); err == nil {
+		t.Fatal("ReadFileLines accepted a zero start line")
+	}
+}
