@@ -59,7 +59,7 @@ func main() {
 		return
 	}
 
-	fmt.Println("EasyCodeAI Alpha0.1 — type /exit to quit, /resume to show the saved task.")
+	fmt.Println("EasyCodeAI Alpha0.1 — /resume restores the saved task, /status shows it, /exit quits.")
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("\n easycode > ")
@@ -74,6 +74,10 @@ func main() {
 		case line == "":
 			continue
 		case line == "/resume":
+			if err := engine.Resume(ctx, os.Stdout); err != nil {
+				fmt.Fprintln(os.Stderr, "resume:", err)
+			}
+		case line == "/status":
 			if err := engine.ShowCheckpoint(os.Stdout); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
