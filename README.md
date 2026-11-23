@@ -73,7 +73,7 @@ easycode --workspace . --model "$NIM_MODEL" --resume
 - `write_file` — create or replace a workspace file
 - `run_checks` — run Go test, vet, and build
 
-The shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands.\n\nIn interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
+The shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands, each with a five-minute timeout and a 1 MiB output cap.\n\nIn interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
 
 ## OpenCode reference
 
