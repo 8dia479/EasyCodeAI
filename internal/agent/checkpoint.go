@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/8dia479/EasyCodeAI/internal/nim"
 )
 
-const checkpointVersion = 1
+const checkpointVersion = 2
 
 type Checkpoint struct {
 	Version      int          `json:"version"`
@@ -18,6 +19,8 @@ type Checkpoint struct {
 	Workspace    string       `json:"workspace"`
 	Phase        string       `json:"phase"`
 	Round        int          `json:"round"`
+	Modified     bool         `json:"modified"`
+	Verification string       `json:"verification"`
 	UpdatedAt    time.Time    `json:"updated_at"`
 	History      []string     `json:"history"`
 	Messages     []nim.Message `json:"messages,omitempty"`
@@ -80,6 +83,16 @@ func loadCheckpoint() (Checkpoint, error) {
 	}
 	if err := json.Unmarshal(data, &cp); err != nil {
 		return cp, fmt.Errorf("decode checkpoint: %w", err)
+	}
+	if cp.Version == 1 {
+		for _, item := range cp.History {
+			if strings.Contains(item, "tool write_file:") {
+				cp.Modified = true
+				cp.Verification = "not-run"
+				break
+			}
+		}
+		cp.Version = checkpointVersion
 	}
 	if cp.Version != checkpointVersion {
 		return cp, fmt.Errorf("unsupported checkpoint version %d (expected %d)", cp.Version, checkpointVersion)
