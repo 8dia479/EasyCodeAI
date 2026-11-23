@@ -14,6 +14,7 @@ import (
 )
 
 const checkpointVersion = 2
+const maxCheckpointSize = 64 << 20
 
 type Checkpoint struct {
 	Version      int          `json:"version"`
@@ -58,6 +59,9 @@ func saveCheckpoint(cp Checkpoint) error {
 	if err != nil {
 		return fmt.Errorf("encode checkpoint: %w", err)
 	}
+	if len(data) > maxCheckpointSize {
+		return fmt.Errorf("checkpoint exceeds the %d MiB safety limit", maxCheckpointSize>>20)
+	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".checkpoint-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create checkpoint temp file: %w", err)
@@ -87,7 +91,18 @@ func saveCheckpoint(cp Checkpoint) error {
 
 func loadCheckpoint() (Checkpoint, error) {
 	var cp Checkpoint
-	data, err := os.ReadFile(statePath())
+	path := statePath()
+	info, err := os.Stat(path)
+	if err != nil {
+		return cp, err
+	}
+	if !info.Mode().IsRegular() {
+		return cp, fmt.Errorf("checkpoint is not a regular file")
+	}
+	if info.Size() > maxCheckpointSize {
+		return cp, fmt.Errorf("checkpoint exceeds the %d MiB safety limit", maxCheckpointSize>>20)
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return cp, err
 	}
