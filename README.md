@@ -41,7 +41,7 @@ go mod tidy
 go build -trimpath -o easycode ./cmd/easycode
 ```
 
-Run `make check` to execute the race-enabled tests, vet, and build checks locally. To cross-compile a Termux Android ARMv7 binary on a Linux build machine, run `make build-android-armv7`; the output is `dist/easycode-android-armv7`.
+Run `make check` to execute the race-enabled tests, vet, and build checks locally. To cross-compile a Termux Android ARMv7 binary on a Linux build machine with Android NDK r27c installed, run `make build-android-armv7`; set `ANDROID_NDK_HOME` if the NDK is not under `$ANDROID_HOME/ndk/27.2.12479018`. The output is `dist/easycode-android-armv7`.
 
 ## Environment variables
 
