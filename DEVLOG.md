@@ -10,10 +10,14 @@
 - Pending tool calls are recovered on resume; already persisted tool results are not executed again.
 - A resumed task receives another bounded execution window instead of immediately hitting the previous round limit; `--max-rounds` configures each invocation (1–200).
 - Added NIM retry handling for HTTP 429, 502, 503, and 504 responses, honoring short Retry-After values without retrying ahead of long server delays and using bounded exponential fallback delays.
-- Made workspace writes atomic, preserved existing file permissions, and limited individual writes to 4 MiB.\n- Added per-command verification timeouts and output caps, and filtered sensitive environment variables from test/build subprocesses.
+- Made workspace writes atomic, preserved existing file permissions, and limited individual writes to 4 MiB.
+- Added per-command verification timeouts and output caps, and filtered sensitive environment variables from test/build subprocesses.
 - Added five-minute timeouts and 1 MiB output limits to each fixed Go verification command.
 - Filtered project-check environment variables so NIM API credentials and model settings are not inherited by test/build processes.
-- Added regression tests for checkpoint serialization, resume workspace isolation, retry behavior, output limits, secret filtering, and atomic workspace writes.
+- Added regression tests for checkpoint serialization, resume workspace isolation, retry behavior, output limits, secret filtering, atomic workspace writes, project discovery, source search, and overwrite permissions.
+- Added project inspection and bounded source search, plus syntax-only checks for Python and JavaScript.
+- Added explicit `--allow-overwrite` and `--allow-project-execution` permissions; Go tests/build are unavailable unless explicitly enabled.
+- Added request/response size limits and a 15-minute overall NIM request timeout; sparse SSE tool-call indices are preserved.
 
 ### Verification state
 
@@ -29,5 +33,5 @@
 - Filesystem path checks still cannot eliminate all TOCTOU races.
 - Verification runs trusted-project Go tests/build code as the local user; environment filtering reduces credential exposure but is not an OS sandbox.
 - Add explicit user approval for potentially risky project execution and file replacement.
-- Add language-aware project inspection/checks and stronger NIM stream/tool-call compatibility tests.
+- Add deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks and more NIM compatibility tests.
 - Improve terminal UX and support configurable per-task execution budgets.
