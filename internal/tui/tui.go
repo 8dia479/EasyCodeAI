@@ -219,7 +219,7 @@ func (m *model) runCommand(run func(context.Context, io.Writer) error) tea.Cmd {
 	m.cancel = cancel
 	m.running = true
 	return func() tea.Msg {
-		writer := streamWriter{send: func(msg tea.Msg) { m.program.Send(msg) }}
+		writer := streamWriter{send: func(msg tea.Msg) { m.sender.p.Send(msg) }}
 		return taskDoneMsg{err: run(ctx, writer)}
 	}
 }
