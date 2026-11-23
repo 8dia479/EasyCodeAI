@@ -7,8 +7,7 @@ build: deps
 	go build -trimpath -o easycode ./cmd/easycode
 
 build-android-armv7: deps
-	mkdir -p dist
-	GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/easycode-android-armv7 ./cmd/easycode
+	bash scripts/build-android-armv7.sh
 
 test: deps
 	go test -race ./...
