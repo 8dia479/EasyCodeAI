@@ -19,7 +19,7 @@
 - Added isolated named sessions, session status/help commands, and protection against replacing unfinished tasks.
 - Added context compaction that preserves the original task and avoids cutting through pending tool-call turns.
 - Added verification-state tracking: edits must be checked or explicitly reported as uncheckable before task completion.
-- Added a Termux installer, Makefile targets, and secret/binary ignore rules.
+- Added a Termux installer, Makefile targets, secret/binary ignore rules, and a local `--doctor` diagnostic that does not contact NIM.
 - Added explicit `--allow-overwrite` and `--allow-project-execution` permissions; Go tests/build are unavailable unless explicitly enabled.
 - Added request/response size limits and a 15-minute overall NIM request timeout; sparse SSE tool-call indices are preserved.
 
@@ -33,7 +33,7 @@
 
 ### Known limitations / next work
 
-- The checkpoint stores one active task, not a multi-session database.
+- Each named session stores one active task; session listing and deletion are not implemented yet.
 - Filesystem path checks still cannot eliminate all TOCTOU races.
 - Verification runs trusted-project Go tests/build code as the local user; environment filtering reduces credential exposure but is not an OS sandbox.
 - File replacement and project-code execution now require explicit CLI opt-ins; this is a permission gate, not an OS sandbox.
