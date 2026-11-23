@@ -189,3 +189,18 @@ func TestRunChecksReportsMissingPythonAsUnavailable(t *testing.T) {
 		t.Fatalf("run_checks result = %q, want checks-unavailable marker", got)
 	}
 }
+
+
+func TestReadFileToolSupportsBoundedLineRanges(t *testing.T) {
+	registry, root := newTestRegistry(t, false, false)
+	if err := os.WriteFile(filepath.Join(root, "large.txt"), []byte("first\nsecond\nthird\nfourth\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := registry.Execute(context.Background(), "read_file", `{"path":"large.txt","start_line":2,"end_line":3}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "second\nthird\n" {
+		t.Fatalf("read_file range = %q, want second and third lines", got)
+	}
+}
