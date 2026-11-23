@@ -37,6 +37,9 @@ func (a *Agent) Run(ctx context.Context, task string, out io.Writer) error {
 	if strings.TrimSpace(task) == "" {
 		return fmt.Errorf("task cannot be empty")
 	}
+	if len(task) > 1<<20 {
+		return fmt.Errorf("task prompt exceeds the 1 MiB limit")
+	}
 	if existing, err := loadCheckpoint(); err == nil {
 		if existing.Phase != "completed" {
 			return fmt.Errorf("session already contains an unfinished task (%s); use /resume or start with a different --session", existing.Phase)
@@ -100,9 +103,13 @@ func (a *Agent) runLoop(ctx context.Context, cp Checkpoint, out io.Writer) error
 			return err
 		}
 
-		beforeCompaction := len(cp.Messages)
+		beforeCompaction := cp.Messages
 		cp.Messages = compactMessages(cp.Messages)
-		if len(cp.Messages) != beforeCompaction {
+		compacted := len(cp.Messages) != len(beforeCompaction)
+		if !compacted && len(cp.Messages) > 2 {
+			compacted = cp.Messages[2].Content != beforeCompaction[2].Content
+		}
+		if compacted {
 			cp.History = append(cp.History, "conversation context compacted")
 			if err := saveCheckpoint(cp); err != nil {
 				return err
@@ -282,7 +289,7 @@ func compactMessages(messages []nim.Message) []nim.Message {
 			break
 		}
 	}
-	if start < 2 {
+	if start <= 2 {
 		return messages
 	}
 
