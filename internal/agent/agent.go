@@ -182,6 +182,9 @@ func (a *Agent) executePendingTools(ctx context.Context, cp *Checkpoint, out io.
 		if toolErr != nil {
 			result = "TOOL ERROR: " + toolErr.Error()
 		}
+		if call.Function.Name == "run_checks" && toolErr != nil {
+			cp.Verification = "failed"
+		}
 		if toolErr == nil {
 			switch call.Function.Name {
 			case "write_file":
