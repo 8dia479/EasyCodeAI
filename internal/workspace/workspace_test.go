@@ -117,3 +117,26 @@ func TestWriteFileRejectsOversizedContent(t *testing.T) {
 		t.Fatalf("oversized file exists or stat failed unexpectedly: %v", statErr)
 	}
 }
+
+
+func TestReadFileCapsLargeFiles(t *testing.T) {
+	root := t.TempDir()
+	ws, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := strings.Repeat("x", (1<<20)+100)
+	if err := os.WriteFile(filepath.Join(root, "large.txt"), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ws.ReadFile("large.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(got, "[truncated at 1 MiB]") {
+		t.Fatalf("large file result lacks truncation marker")
+	}
+	if len(got) > (1<<20)+100 {
+		t.Fatalf("read result unexpectedly exceeds cap: %d bytes", len(got))
+	}
+}
