@@ -25,6 +25,7 @@ else
 fi
 
 cd "$repo_dir"
+go mod tidy
 go build -trimpath -o "$PREFIX/bin/easycode" ./cmd/easycode
 chmod 700 "$PREFIX/bin/easycode"
 
