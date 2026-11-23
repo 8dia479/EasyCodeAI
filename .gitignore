@@ -1,5 +1,10 @@
-easycode
+/easycode
+/bin/
+/dist/
 *.test
+*.out
 coverage.out
 .env
+.env.*
+API.env
 .easycode/
