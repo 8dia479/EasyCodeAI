@@ -16,13 +16,17 @@ jobs:
           cache: true
       - name: Resolve Go module dependencies
         run: go mod tidy
-      - name: Validate Termux installer syntax
-        run: bash -n scripts/install-termux.sh
+      - name: Validate installer scripts
+        run: bash -n scripts/install-termux.sh scripts/build-android-armv7.sh
       - name: Test
         run: go test -race ./...
       - name: Vet
         run: go vet ./...
       - name: Build
         run: go build ./...
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android NDK r27c
+        run: sdkmanager "ndk;27.2.12479018"
       - name: Cross-build Termux ARMv7 binary
-        run: GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /tmp/easycode-android-armv7 ./cmd/easycode
+        run: bash scripts/build-android-armv7.sh
