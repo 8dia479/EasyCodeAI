@@ -165,6 +165,7 @@ func (r *Registry) inspectProject() (string, error) {
 	}
 	found := make([]string, 0)
 	languages := map[string]bool{}
+	visited := 0
 	err := filepath.WalkDir(r.ws.Root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -182,7 +183,8 @@ func (r *Registry) inspectProject() (string, error) {
 		if rel == "." {
 			return nil
 		}
-		if len(found) >= 200 {
+		visited++
+		if visited > maxSearchFiles || len(found) >= 200 {
 			return filepath.SkipAll
 		}
 		name := entry.Name()
@@ -362,6 +364,7 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 
 func collectSourceFiles(root string, extensions map[string]bool) ([]string, []string) {
 	var pythonFiles, jsFiles []string
+	visited := 0
 	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -371,6 +374,10 @@ func collectSourceFiles(root string, extensions map[string]bool) ([]string, []st
 				return filepath.SkipDir
 			}
 			return nil
+		}
+		visited++
+		if visited > maxSearchFiles {
+			return filepath.SkipAll
 		}
 		if info, err := entry.Info(); err == nil && info.Mode().IsRegular() && info.Size() <= 1<<20 {
 			ext := strings.ToLower(filepath.Ext(path))
