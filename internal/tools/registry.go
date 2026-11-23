@@ -186,7 +186,7 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 			return "", err
 		}
 		if backupPath != "" {
-			return "Wrote " + filepath.Clean(path) + " (previous version backed up to " + backupPath + ")", nil
+			return "Wrote " + filepath.Clean(path) + "\nprevious version backed up to " + backupPath, nil
 		}
 		return "Wrote " + filepath.Clean(path), nil
 
@@ -216,8 +216,8 @@ func (r *Registry) inspectProject() (string, error) {
 		"go.mod", "go.work", "package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json",
 		"pyproject.toml", "requirements.txt", "Pipfile", "Cargo.toml", "pom.xml", "build.gradle",
 		"composer.json", "Gemfile", "Package.swift", "pubspec.yaml", "mix.exs",
-		"build.gradle.kts", "settings.gradle", "settings.gradle.kts", "*.sln", "*.csproj",
-		"CMakeLists.txt", "Makefile",
+		"build.gradle.kts", "settings.gradle", "settings.gradle.kts", "*.sln", "*.slnx", "*.csproj",
+		"*.fsproj", "*.vbproj", "CMakeLists.txt", "Makefile",
 	}
 	found := make([]string, 0)
 	languages := map[string]bool{}
@@ -245,9 +245,12 @@ func (r *Registry) inspectProject() (string, error) {
 		}
 		name := entry.Name()
 		for _, manifest := range manifests {
-			matched, _ := filepath.Match(manifest, name)
+			matched, _ := filepath.Match(strings.ToLower(manifest), strings.ToLower(name))
 			if matched {
 				found = append(found, rel)
+				if language, ok := manifestLanguage(name); ok {
+					languages[language] = true
+				}
 				break
 			}
 		}
@@ -310,6 +313,41 @@ func (r *Registry) inspectProject() (string, error) {
 		"\nDo not assume a framework or test command that is not supported by the detected files.", nil
 }
 
+func manifestLanguage(name string) (string, bool) {
+	switch strings.ToLower(name) {
+	case "go.mod", "go.work":
+		return "Go", true
+	case "cargo.toml":
+		return "Rust", true
+	case "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts":
+		return "Java", true
+	case "gemfile":
+		return "Ruby", true
+	case "pyproject.toml", "requirements.txt", "pipfile":
+		return "Python", true
+	case "composer.json":
+		return "PHP", true
+	case "package.swift":
+		return "Swift", true
+	case "pubspec.yaml":
+		return "Dart", true
+	case "mix.exs":
+		return "Elixir", true
+	case "package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json":
+		return "JavaScript", true
+	}
+	lower := strings.ToLower(name)
+	switch {
+	case strings.HasSuffix(lower, ".csproj"), strings.HasSuffix(lower, ".sln"), strings.HasSuffix(lower, ".slnx"):
+		return "C#", true
+	case strings.HasSuffix(lower, ".fsproj"):
+		return "F#", true
+	case strings.HasSuffix(lower, ".vbproj"):
+		return "Visual Basic", true
+	}
+	return "", false
+}
+
 func (r *Registry) searchFiles(ctx context.Context, query string) (string, error) {
 	query = strings.ToLower(query)
 	results := make([]string, 0)
@@ -344,8 +382,7 @@ func (r *Registry) searchFiles(ctx context.Context, query string) (string, error
 		if readErr != nil || bytes.IndexByte(data, 0) >= 0 {
 			return nil
 		}
-		for lineNo, line := range strings.Split(string(data), "
-") {
+		for lineNo, line := range strings.Split(string(data), "\n") {
 			if strings.Contains(strings.ToLower(line), query) {
 				line = strings.TrimSpace(line)
 				if len(line) > 1200 {
