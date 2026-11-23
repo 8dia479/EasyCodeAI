@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,6 +18,7 @@ const checkpointVersion = 2
 type Checkpoint struct {
 	Version      int          `json:"version"`
 	Task         string       `json:"task"`
+	Session      string       `json:"session,omitempty"`
 	Workspace    string       `json:"workspace"`
 	Phase        string       `json:"phase"`
 	Round        int          `json:"round"`
@@ -27,14 +30,21 @@ type Checkpoint struct {
 }
 
 func statePath() string {
-	if dir := os.Getenv("EASYCODE_STATE_DIR"); dir != "" {
+	dir := os.Getenv("EASYCODE_STATE_DIR")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			dir = ".easycode"
+		} else {
+			dir = filepath.Join(home, ".easycode")
+		}
+	}
+	session := strings.TrimSpace(os.Getenv("EASYCODE_SESSION"))
+	if session == "" || session == "default" {
 		return filepath.Join(dir, "checkpoint.json")
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ".easycode/checkpoint.json"
-	}
-	return filepath.Join(home, ".easycode", "checkpoint.json")
+	sum := sha256.Sum256([]byte(session))
+	return filepath.Join(dir, "sessions", hex.EncodeToString(sum[:])+".json")
 }
 
 func saveCheckpoint(cp Checkpoint) error {
