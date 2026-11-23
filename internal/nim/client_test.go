@@ -55,12 +55,15 @@ func TestCompleteRetriesRateLimitedRequest(t *testing.T) {
 	}
 }
 
-func TestRetryDelayHonorsRetryAfterAndCapsIt(t *testing.T) {
-	if got := retryDelay("0", 2); got != 0 {
-		t.Fatalf("zero Retry-After = %s, want 0", got)
+func TestRetryDelayHonorsRetryAfterAndSkipsLongWaits(t *testing.T) {
+	if got, ok := retryDelay("0", 2); !ok || got != 0 {
+		t.Fatalf("zero Retry-After = (%s, %v), want (0, true)", got, ok)
 	}
-	if got := retryDelay("120", 0); got != 30*time.Second {
-		t.Fatalf("capped Retry-After = %s, want 30s", got)
+	if got, ok := retryDelay("120", 0); !ok || got != 120*time.Second {
+		t.Fatalf("120-second Retry-After = (%s, %v), want (120s, true)", got, ok)
+	}
+	if _, ok := retryDelay("3600", 0); ok {
+		t.Fatal("one-hour Retry-After should not be retried early")
 	}
 	if isRetryableStatus(http.StatusBadRequest) {
 		t.Fatal("400 must not be retried")
