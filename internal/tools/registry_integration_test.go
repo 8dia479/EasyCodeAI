@@ -43,6 +43,9 @@ func TestInspectProjectDetectsLanguagesAndManifests(t *testing.T) {
 }
 
 func TestWriteFileRequiresOptInToReplaceExistingFiles(t *testing.T) {
+	stateDir := t.TempDir()
+	t.Setenv("EASYCODE_STATE_DIR", stateDir)
+	t.Setenv("EASYCODE_SESSION", "default")
 	registry, root := newTestRegistry(t, false, false)
 	path := filepath.Join(root, "main.go")
 	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
@@ -61,8 +64,29 @@ func TestWriteFileRequiresOptInToReplaceExistingFiles(t *testing.T) {
 
 	allowed, _ := newTestRegistry(t, false, true)
 	allowed.ws = registry.ws
-	if _, err := allowed.Execute(context.Background(), "write_file", `{"path":"main.go","content":"new"}`); err != nil {
+	result, err := allowed.Execute(context.Background(), "write_file", `{"path":"main.go","content":"new"}`)
+	if err != nil {
 		t.Fatal(err)
+	}
+	marker := "backed up to "
+	index := strings.Index(result, marker)
+	if index < 0 {
+		t.Fatalf("write result does not report a backup path: %q", result)
+	}
+	backupPath := strings.TrimSpace(result[index+len(marker):])
+	backupData, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("read safety backup: %v", err)
+	}
+	if string(backupData) != "old" {
+		t.Fatalf("backup contains %q, want original contents", backupData)
+	}
+	backupInfo, err := os.Stat(backupPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if backupInfo.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("backup permissions = %o, want owner-only", backupInfo.Mode().Perm())
 	}
 	data, err = os.ReadFile(path)
 	if err != nil {
