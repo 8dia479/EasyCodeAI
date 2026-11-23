@@ -15,7 +15,7 @@
 - Added five-minute timeouts and 1 MiB output limits to each fixed Go verification command.
 - Filtered project-check environment variables so NIM API credentials and model settings are not inherited by test/build processes.
 - Added regression tests for checkpoint serialization, resume workspace isolation, retry behavior, output limits, secret filtering, atomic workspace writes, project discovery, source search, and overwrite permissions.
-- Added project inspection and bounded source search, plus syntax-only checks for Python and JavaScript.
+- Added project inspection and bounded source search, plus syntax-only checks for Python and JavaScript.\n- Added bounded line-range reads for inspecting large files without loading entire files into model context.
 - Added isolated named sessions, session status/help commands, and protection against replacing unfinished tasks.
 - Added context compaction that preserves the original task and avoids cutting through pending tool-call turns.
 - Added verification-state tracking: edits must be checked or explicitly reported as uncheckable before task completion.
