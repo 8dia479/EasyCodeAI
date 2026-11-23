@@ -1,18 +1,21 @@
-.PHONY: build test vet check fmt
+.PHONY: deps build test vet check fmt
 
-build:
+deps:
+	go mod tidy
+
+build: deps
 	go build -trimpath -o easycode ./cmd/easycode
 
-test:
+test: deps
 	go test -race ./...
 
-vet:
+vet: deps
 	go vet ./...
 
 fmt:
 	gofmt -w $$(find . -name '*.go' -type f)
 
-check:
+check: deps
 	bash -n scripts/install-termux.sh
 	go test -race ./...
 	go vet ./...
