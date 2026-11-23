@@ -9,7 +9,7 @@ A Termux-first, OpenAI-compatible coding agent powered by NVIDIA NIM.
 - Run directly in Termux; no desktop runtime or hosted agent server.
 - Use NVIDIA NIM's OpenAI-compatible API.
 - Stream each inference response and batch multiple tool calls into one model turn where supported.
-- Persist task progress so interrupted work can be inspected; automatic conversation restoration is still pending.
+- Persist the full model conversation, assistant tool calls, and tool results so interrupted tasks can be resumed.
 - Keep file access inside the selected workspace.
 - Iterate through inspect → plan → edit → test → repair.
 
@@ -67,7 +67,7 @@ easycode --workspace . --model "$NIM_MODEL" --prompt "Inspect this project, fix 
 - `write_file` — create or replace a workspace file
 - `run_checks` — run Go test, vet, and build
 
-The shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands.
+The shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands.\n\nIn interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
 
 ## OpenCode reference
 
@@ -75,4 +75,4 @@ The CLI interaction and agent architecture are informed by the public OpenCode p
 
 ## Development status
 
-Alpha0.1 is an early foundation. Recent hardening adds symlink-aware workspace path checks and regression tests, plus delivery of non-streaming NIM response text. Remaining work includes automatic conversation restoration, race-free filesystem access (the current path checks cannot eliminate filesystem TOCTOU races), cross-language project checks, tool-call recovery after partial streams, explicit approval controls, a richer terminal UI, and queue-aware retry/backoff based on observed NIM behavior. CI is configured for race-enabled tests, vet, and build; the latest run has not yet been independently verified.
+Alpha0.1 is an early foundation. Recent hardening adds symlink-aware workspace path checks and regression tests, plus delivery of non-streaming NIM response text. Remaining work includes cross-language project checks, stronger filesystem race resistance (the current path checks cannot eliminate filesystem TOCTOU races), explicit approval controls, a richer terminal UI, and queue-aware retry/backoff based on observed NIM behavior. CI is configured for race-enabled tests, vet, and build; the latest run has not yet been independently verified.
