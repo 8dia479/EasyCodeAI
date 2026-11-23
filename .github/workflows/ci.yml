@@ -32,3 +32,9 @@ jobs:
         run: sdkmanager "ndk;27.2.12479018"
       - name: Cross-build Termux ARMv7 binary
         run: bash scripts/build-android-armv7.sh
+      - name: Upload Termux ARMv7 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: EasyCodeAI-Alpha0.1-android-armv7
+          path: dist/easycode-android-armv7
+          if-no-files-found: error
