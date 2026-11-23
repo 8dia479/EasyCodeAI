@@ -134,3 +134,34 @@ func TestRunChecksMarksDocumentationOnlyWorkspaceAsChecked(t *testing.T) {
 		t.Fatalf("run_checks result = %q, want checks-passed marker", got)
 	}
 }
+
+
+func TestRunChecksReportsMissingGoToolchainAsUnavailable(t *testing.T) {
+	registry, root := newTestRegistry(t, true, false)
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example\n\ngo 1.22\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+	got, err := registry.Execute(context.Background(), "run_checks", "{}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "[checks-unavailable]") {
+		t.Fatalf("run_checks result = %q, want checks-unavailable marker", got)
+	}
+}
+
+func TestRunChecksReportsMissingPythonAsUnavailable(t *testing.T) {
+	registry, root := newTestRegistry(t, false, false)
+	if err := os.WriteFile(filepath.Join(root, "main.py"), []byte("print('ok')"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+	got, err := registry.Execute(context.Background(), "run_checks", "{}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "[checks-unavailable]") {
+		t.Fatalf("run_checks result = %q, want checks-unavailable marker", got)
+	}
+}
