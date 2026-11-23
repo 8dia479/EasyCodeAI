@@ -13,7 +13,9 @@ import (
 )
 
 type Options struct {
-	MaxRounds int
+	MaxRounds             int
+	AllowProjectExecution bool
+	AllowFileOverwrite    bool
 }
 
 type Agent struct {
@@ -27,7 +29,7 @@ func New(client *nim.Client, ws *workspace.Workspace, opts Options) *Agent {
 	if opts.MaxRounds <= 0 {
 		opts.MaxRounds = 20
 	}
-	return &Agent{client: client, ws: ws, opts: opts, tools: tools.New(ws)}
+	return &Agent{client: client, ws: ws, opts: opts, tools: tools.New(ws, opts.AllowProjectExecution, opts.AllowFileOverwrite)}
 }
 
 func (a *Agent) Run(ctx context.Context, task string, out io.Writer) error {
@@ -206,5 +208,5 @@ func (a *Agent) ShowCheckpoint(out io.Writer) error {
 
 func systemPrompt(root string) string {
 	return "You are EasyCodeAI, an autonomous coding agent in Termux. Workspace: " + root +
-		". Inspect before editing. Use tools for filesystem operations and checks. Never claim a file changed unless write_file succeeded or tests passed unless run_checks succeeded. Stay within workspace; avoid overwriting unrelated files. Work iteratively: inspect, plan, edit, test, diagnose, fix, retest. Finish only when complete and verified, ending with <easycode-done>."
+		". Start with inspect_project and targeted search_files/read_file calls. Never assume a language, framework, command, or file that you have not inspected. Use only the provided tools; never invent shell access. Stay inside the workspace. Before changing existing files, inspect their complete relevant contents and preserve unrelated behavior. Use small coherent edits, then run_checks. Python and JavaScript checks are syntax-only; Go tests/build execute project code and are available only when the user explicitly enabled them. If a required tool is denied, explain the limitation and do not pretend it ran. Continue iteratively: inspect, plan, edit, test, diagnose, fix, retest. Do not claim success without evidence. Finish with <easycode-done> only after the task is actually complete and the available checks pass."
 }
