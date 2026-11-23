@@ -69,3 +69,43 @@ func TestRetryDelayHonorsRetryAfterAndSkipsLongWaits(t *testing.T) {
 		t.Fatal("400 must not be retried")
 	}
 }
+
+
+func TestCompletePreservesSparseToolCallIndices(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintln(w, `data: {"choices":[{"delta":{"tool_calls":[{"index":4,"id":"call-4","type":"function","function":{"name":"write_file","arguments":"{}"}}]}}]}`)
+		fmt.Fprintln(w, `data: {"choices":[{"delta":{"tool_calls":[{"index":1,"id":"call-1","type":"function","function":{"name":"read_file","arguments":"{}"}}]}}]}`)
+		fmt.Fprintln(w, "data: [DONE]")
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", "test-model")
+	msg, err := client.Complete(context.Background(), []Message{{Role: "user", Content: "hello"}}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msg.ToolCalls) != 2 {
+		t.Fatalf("tool calls = %d, want 2", len(msg.ToolCalls))
+	}
+	if msg.ToolCalls[0].ID != "call-1" || msg.ToolCalls[1].ID != "call-4" {
+		t.Fatalf("tool call order/IDs = %+v", msg.ToolCalls)
+	}
+}
+
+func TestCompleteRejectsOversizedRequestBeforeNetwork(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", "test-model")
+	_, err := client.Complete(context.Background(), []Message{{Role: "user", Content: strings.Repeat("x", 17<<20)}}, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "16 MiB") {
+		t.Fatalf("Complete() error = %v, want request size limit", err)
+	}
+	if called {
+		t.Fatal("oversized request unexpectedly reached the server")
+	}
+}
