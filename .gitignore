@@ -1,0 +1,5 @@
+easycode
+*.test
+coverage.out
+.env
+.easycode/

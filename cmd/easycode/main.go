@@ -1,0 +1,91 @@
+package main
+
+import (
+	"bufio"
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+
+	"github.com/8dia479/EasyCodeAI/internal/agent"
+	"github.com/8dia479/EasyCodeAI/internal/nim"
+	"github.com/8dia479/EasyCodeAI/internal/workspace"
+)
+
+func main() {
+	var prompt string
+	var model string
+	var baseURL string
+	var root string
+	flag.StringVar(&prompt, "prompt", "", "task to give the coding agent")
+	flag.StringVar(&model, "model", os.Getenv("NIM_MODEL"), "NVIDIA NIM model ID")
+	flag.StringVar(&baseURL, "base-url", os.Getenv("NIM_BASE_URL"), "OpenAI-compatible NIM base URL")
+	flag.StringVar(&root, "workspace", os.Getenv("EASYCODE_WORKSPACE"), "project workspace")
+	flag.Parse()
+
+	if root == "" {
+		root, _ = os.Getwd()
+	}
+	if baseURL == "" {
+		baseURL = "https://integrate.api.nvidia.com/v1"
+	}
+	if model == "" {
+		fmt.Fprintln(os.Stderr, "NIM_MODEL is required (or pass --model)")
+		os.Exit(2)
+	}
+	apiKey := os.Getenv("NIM_API_KEY")
+	if apiKey == "" {
+		fmt.Fprintln(os.Stderr, "NIM_API_KEY is required")
+		os.Exit(2)
+	}
+
+	ws, err := workspace.New(root)
+	if err != nil {
+		fatal(err)
+	}
+	client := nim.NewClient(baseURL, apiKey, model)
+	engine := agent.New(client, ws, agent.Options{})
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if prompt != "" {
+		if err := engine.Run(ctx, prompt, os.Stdout); err != nil {
+			fatal(err)
+		}
+		return
+	}
+
+	fmt.Println("EasyCodeAI Alpha0.1 — type /exit to quit, /resume to show the saved task.")
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("\n easycode > ")
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return
+		}
+		line = strings.TrimSpace(line)
+		switch {
+		case line == "/exit" || line == "/quit":
+			return
+		case line == "":
+			continue
+		case line == "/resume":
+			if err := engine.ShowCheckpoint(os.Stdout); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
+		default:
+			if err := engine.Run(ctx, line, os.Stdout); err != nil {
+				fmt.Fprintln(os.Stderr, "agent:", err)
+			}
+		}
+	}
+}
+
+func fatal(err error) {
+	fmt.Fprintln(os.Stderr, "easycode:", err)
+	os.Exit(1)
+}
