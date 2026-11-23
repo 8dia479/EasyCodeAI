@@ -16,6 +16,7 @@ type Engine interface {
 	Run(context.Context, string, io.Writer) error
 	Resume(context.Context, io.Writer) error
 	ShowCheckpoint(io.Writer) error
+	SetModel(string)
 }
 
 type outputMsg string
@@ -110,6 +111,10 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if !m.running && len(m.input) == 0 {
 				return m, tea.Quit
 			}
+		case tea.KeyTab:
+			if !m.running {
+				m.completeCommand()
+			}
 		case tea.KeyEnter:
 			if m.running {
 				return m, nil
@@ -166,7 +171,15 @@ func (m model) handleInput(line string) (tea.Model, tea.Cmd) {
 		case "/help":
 			m.appendLog("Commands:\n  /help       Show this help\n  /resume     Resume the saved task\n  /status     Show checkpoint and task status\n  /model      Show the configured model\n  /workspace  Show the active project directory\n  /clear      Clear the visible conversation\n  /exit       Exit EasyCodeAI\n\nCtrl+C cancels an active task; when idle it exits.")
 		case "/model":
-			m.appendLog("Model: " + m.modelName + "\nChange NIM_MODEL before starting EasyCodeAI to use another model.")
+			if len(parts) == 1 {
+				m.appendLog("Model: " + m.modelName + "\nUsage: /model <NIM model ID>")
+			} else if len(parts) == 2 {
+				m.modelName = parts[1]
+				m.engine.SetModel(parts[1])
+				m.appendLog("Active model changed to: " + m.modelName)
+			} else {
+				m.appendLog("Usage: /model <NIM model ID>")
+			}
 		case "/workspace":
 			m.appendLog("Workspace: " + m.workspace)
 		case "/clear":
@@ -186,6 +199,26 @@ func (m model) handleInput(line string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, m.startTask(line, false)
+}
+
+func (m *model) completeCommand() {
+	if len(m.input) == 0 || m.input[0] != '/' {
+		return
+	}
+	commands := []string{"/help", "/resume", "/status", "/model", "/workspace", "/clear", "/exit"}
+	prefix := string(m.input)
+	matches := make([]string, 0, len(commands))
+	for _, command := range commands {
+		if strings.HasPrefix(command, prefix) {
+			matches = append(matches, command)
+		}
+	}
+	if len(matches) == 1 {
+		m.input = []rune(matches[0] + " ")
+		m.cursor = len(m.input)
+	} else if len(matches) > 1 {
+		m.appendLog("Commands: " + strings.Join(matches, "  "))
+	}
 }
 
 func (m *model) startTask(prompt string, resume bool) tea.Cmd {
