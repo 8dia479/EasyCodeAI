@@ -5,6 +5,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/url"
+	"os/exec"
+	"runtime"
 	"os"
 	"os/signal"
 	"strings"
@@ -25,6 +28,7 @@ func main() {
 	var allowProjectExecution bool
 	var allowOverwrite bool
 	var session string
+	var doctor bool
 	flag.StringVar(&prompt, "prompt", "", "task to give the coding agent")
 	flag.StringVar(&model, "model", os.Getenv("NIM_MODEL"), "NVIDIA NIM model ID")
 	flag.StringVar(&baseURL, "base-url", os.Getenv("NIM_BASE_URL"), "OpenAI-compatible NIM base URL")
@@ -34,6 +38,7 @@ func main() {
 	flag.BoolVar(&allowProjectExecution, "allow-project-execution", false, "allow Go tests/build to execute code from the workspace")
 	flag.BoolVar(&allowOverwrite, "allow-overwrite", false, "allow the agent to replace existing workspace files")
 	flag.StringVar(&session, "session", os.Getenv("EASYCODE_SESSION"), "named persistent task session (letters, digits, dot, dash, underscore)")
+	flag.BoolVar(&doctor, "doctor", false, "check local configuration and tool availability without contacting NIM")
 	flag.Parse()
 
 	if len(session) > 64 {
@@ -62,11 +67,17 @@ func main() {
 	if baseURL == "" {
 		baseURL = "https://integrate.api.nvidia.com/v1"
 	}
+	apiKey := os.Getenv("NIM_API_KEY")
+	if doctor {
+		if err := runDoctor(root, baseURL, model, apiKey != ""); err != nil {
+			fatal(err)
+		}
+		return
+	}
 	if model == "" {
 		fmt.Fprintln(os.Stderr, "NIM_MODEL is required (or pass --model)")
 		os.Exit(2)
 	}
-	apiKey := os.Getenv("NIM_API_KEY")
 	if apiKey == "" {
 		fmt.Fprintln(os.Stderr, "NIM_API_KEY is required")
 		os.Exit(2)
@@ -137,4 +148,39 @@ func main() {
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, "easycode:", err)
 	os.Exit(1)
+}
+
+
+func runDoctor(root, baseURL, model string, hasAPIKey bool) error {
+	fmt.Println("EasyCodeAI environment check")
+	fmt.Printf("Go runtime: %s\n", runtime.Version())
+	if _, err := url.ParseRequestURI(baseURL); err != nil {
+		fmt.Printf("NIM endpoint: invalid (%v)\n", err)
+	} else {
+		fmt.Printf("NIM endpoint: configured (%s)\n", baseURL)
+	}
+	if model == "" {
+		fmt.Println("NIM model: missing (set NIM_MODEL or --model)")
+	} else {
+		fmt.Printf("NIM model: %s\n", model)
+	}
+	if hasAPIKey {
+		fmt.Println("NIM API key: present (value hidden)")
+	} else {
+		fmt.Println("NIM API key: missing")
+	}
+	if _, err := workspace.New(root); err != nil {
+		fmt.Printf("Workspace: invalid (%v)\n", err)
+	} else {
+		fmt.Printf("Workspace: accessible (%s)\n", root)
+	}
+	for _, name := range []string{"go", "python3", "python", "node"} {
+		if path, err := exec.LookPath(name); err == nil {
+			fmt.Printf("%s: %s\n", name, path)
+		} else {
+			fmt.Printf("%s: not found\n", name)
+		}
+	}
+	fmt.Println("Note: this check does not send a request to NVIDIA NIM.")
+	return nil
 }
