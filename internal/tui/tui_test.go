@@ -24,3 +24,11 @@ func TestWrapLineKeepsShortLine(t *testing.T) {
 		t.Fatalf("wrapLine(%q) = %#v, want one unchanged line", input, got)
 	}
 }
+
+func TestSlashCommandCompletion(t *testing.T) {
+	m := model{input: []rune("/hel")}
+	m.completeCommand()
+	if got, want := string(m.input), "/help "; got != want {
+		t.Fatalf("completed input = %q, want %q", got, want)
+	}
+}
