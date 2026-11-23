@@ -2,62 +2,77 @@
 
 A Termux-first, OpenAI-compatible coding agent powered by NVIDIA NIM.
 
-> Alpha0.1 — early development. The first milestone establishes a portable Go CLI, NIM streaming client, resumable task state, and a guarded local tool runner.
+**Alpha0.1** establishes a native Go CLI, streamed NIM chat-completions transport, model tool-calling, workspace-scoped file tools, a restricted Go verification tool, and persistent task checkpoints.
 
-## Goals
+## Design goals
 
-- Run natively in Termux without a desktop runtime.
-- Use NVIDIA NIM chat-completions-compatible endpoints.
-- Keep each model response streaming for as long as practical.
-- Persist task checkpoints so interrupted work can resume.
-- Execute repository tools locally with explicit workspace boundaries.
-- Iterate through inspect → plan → edit → test → repair, while making every model round-trip visible.
+- Run directly in Termux; no desktop runtime or hosted agent server.
+- Use NVIDIA NIM's OpenAI-compatible API.
+- Stream each inference response and batch multiple tool calls into one model turn where supported.
+- Persist progress so interrupted tasks can be inspected and resumed.
+- Keep file access inside the selected workspace.
+- Iterate through inspect → plan → edit → test → repair.
 
-## Important queueing note
+## Queueing strategy and limitations
 
-EasyCodeAI does not assume that a NIM request can be kept alive after the model has completed its response. Tool execution that requires sending tool results back to the model necessarily starts another inference request and may encounter the provider queue again. The agent therefore supports batched tool planning and durable checkpoints to reduce unnecessary round-trips without pretending that one completed response is a persistent server session.
+EasyCodeAI batches all tool calls returned in one assistant response, executes them locally, then sends the collected tool results together in the next inference request. This avoids a separate model request for every individual tool. It does **not** bypass NVIDIA's queue: each new inference request can be queued again. A completed response is not treated as a persistent server-side session, and streaming is not described as queue-free execution.
 
 ## Requirements
 
 - Go 1.22+
-- Termux packages: `pkg install golang git`
+- Termux: `pkg install golang git`
 - NVIDIA NIM API key and an OpenAI-compatible NIM endpoint
 
-## Quick start
+## Build and run
 
 ```sh
+git clone https://github.com/8dia479/EasyCodeAI.git
+cd EasyCodeAI
+git switch Alpha0.1
 go build -o easycode ./cmd/easycode
-./easycode --help
 ```
 
-Set credentials using environment variables:
+Set the API configuration:
 
 ```sh
 export NIM_API_KEY="..."
 export NIM_BASE_URL="https://integrate.api.nvidia.com/v1"
-export NIM_MODEL="nvidia/llama-3.3-nemotron-super-49b-v1"
+export NIM_MODEL="your/nim-model-id"
 ```
 
-Then run:
+Run inside the project you want the agent to work on:
 
 ```sh
-./easycode
+/path/to/EasyCodeAI/easycode
 ```
 
-## Configuration
+Or give a one-shot task:
 
-Environment variables are preferred for secrets:
+```sh
+easycode --workspace . --model "$NIM_MODEL" --prompt "Inspect this project, fix the failing tests, and verify the changes."
+```
 
-- `NIM_API_KEY` — required
-- `NIM_BASE_URL` — defaults to NVIDIA's hosted NIM endpoint
-- `NIM_MODEL` — required; model IDs vary by NIM catalog
-- `EASYCODE_WORKSPACE` — defaults to the current directory
-- `EASYCODE_STATE_DIR` — defaults to `~/.easycode`
+## Environment variables
+
+- `NIM_API_KEY` — required; keep it out of source control
+- `NIM_BASE_URL` — defaults to `https://integrate.api.nvidia.com/v1`
+- `NIM_MODEL` — required unless passed with `--model`
+- `EASYCODE_WORKSPACE` — workspace path; defaults to current directory
+- `EASYCODE_STATE_DIR` — checkpoint directory; defaults to `~/.easycode`
+
+## Current tools
+
+- `list_files` — list workspace entries
+- `read_file` — read a workspace file
+- `write_file` — create or replace a workspace file
+- `run_checks` — run Go test, vet, and build
+
+The shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands.
 
 ## OpenCode reference
 
-The CLI interaction and agent architecture are informed by the public OpenCode project. EasyCodeAI is an independent Go implementation, not a copy of OpenCode source. OpenCode is MIT-licensed; if code is later adapted directly, its copyright and license notice must be preserved.
+The CLI interaction and agent architecture are informed by the public OpenCode project. EasyCodeAI is an independent Go implementation. OpenCode is MIT-licensed; any future direct code adaptation must retain the applicable copyright and license notices.
 
-## Status
+## Development status
 
-Alpha0.1 currently contains the initial CLI, NIM streaming transport, checkpoint persistence, and safe workspace file/shell tools. Tool-calling orchestration, richer terminal UI, model discovery, and queue-aware scheduling are planned next.
+Alpha0.1 is an early foundation. Remaining work includes cross-language project checks, stronger symlink-aware workspace isolation, tool-call recovery after partial streams, explicit approval controls, a richer terminal UI, and queue-aware retry/backoff based on observed NIM behavior.
