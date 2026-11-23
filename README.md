@@ -55,7 +55,7 @@ easycode --workspace . --model "$NIM_MODEL" --prompt "Inspect this project, fix 
 Resume the most recently saved task in the same workspace:
 
 ```sh
-easycode --workspace . --model "$NIM_MODEL" --resume
+easycode --workspace . --model "$NIM_MODEL" --max-rounds 40 --resume
 ```
 
 ## Environment variables
@@ -73,7 +73,7 @@ easycode --workspace . --model "$NIM_MODEL" --resume
 - `write_file` — create or replace a workspace file
 - `run_checks` — run Go test, vet, and build
 
-The shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands, each with a five-minute timeout and a 1 MiB output cap.\n\nIn interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
+Use `--max-rounds N` (1–200) to set the model-round budget for each invocation; `/resume` or `--resume` continues the same task with a fresh budget.\n\nThe shell is not exposed to the model in Alpha0.1. The verification tool only runs fixed Go commands, each with a five-minute timeout and a 1 MiB output cap.\n\nIn interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
 
 ## OpenCode reference
 
