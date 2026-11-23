@@ -24,6 +24,7 @@ func main() {
 	var maxRounds int
 	var allowProjectExecution bool
 	var allowOverwrite bool
+	var session string
 	flag.StringVar(&prompt, "prompt", "", "task to give the coding agent")
 	flag.StringVar(&model, "model", os.Getenv("NIM_MODEL"), "NVIDIA NIM model ID")
 	flag.StringVar(&baseURL, "base-url", os.Getenv("NIM_BASE_URL"), "OpenAI-compatible NIM base URL")
@@ -32,7 +33,24 @@ func main() {
 	flag.IntVar(&maxRounds, "max-rounds", 20, "maximum model rounds per invocation (1-200)")
 	flag.BoolVar(&allowProjectExecution, "allow-project-execution", false, "allow Go tests/build to execute code from the workspace")
 	flag.BoolVar(&allowOverwrite, "allow-overwrite", false, "allow the agent to replace existing workspace files")
+	flag.StringVar(&session, "session", os.Getenv("EASYCODE_SESSION"), "named persistent task session (letters, digits, dot, dash, underscore)")
 	flag.Parse()
+
+	if len(session) > 64 {
+		fmt.Fprintln(os.Stderr, "--session must be at most 64 characters")
+		os.Exit(2)
+	}
+	for _, ch := range session {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '.') {
+			fmt.Fprintln(os.Stderr, "--session may contain only letters, digits, dot, dash, and underscore")
+			os.Exit(2)
+		}
+	}
+	if session != "" {
+		if err := os.Setenv("EASYCODE_SESSION", session); err != nil {
+			fatal(err)
+		}
+	}
 
 	if maxRounds < 1 || maxRounds > 200 {
 		fmt.Fprintln(os.Stderr, "--max-rounds must be between 1 and 200")
@@ -106,6 +124,8 @@ func main() {
 			if err := engine.ShowCheckpoint(os.Stdout); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
+		case line == "/help":
+			fmt.Println("/resume  continue the saved task\n/status  show the current session\n/help    show commands\n/exit    quit")
 		default:
 			if err := engine.Run(ctx, line, os.Stdout); err != nil {
 				fmt.Fprintln(os.Stderr, "agent:", err)
