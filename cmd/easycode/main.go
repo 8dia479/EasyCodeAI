@@ -20,10 +20,12 @@ func main() {
 	var model string
 	var baseURL string
 	var root string
+	var resume bool
 	flag.StringVar(&prompt, "prompt", "", "task to give the coding agent")
 	flag.StringVar(&model, "model", os.Getenv("NIM_MODEL"), "NVIDIA NIM model ID")
 	flag.StringVar(&baseURL, "base-url", os.Getenv("NIM_BASE_URL"), "OpenAI-compatible NIM base URL")
 	flag.StringVar(&root, "workspace", os.Getenv("EASYCODE_WORKSPACE"), "project workspace")
+	flag.BoolVar(&resume, "resume", false, "resume the saved task for this workspace")
 	flag.Parse()
 
 	if root == "" {
@@ -51,6 +53,16 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if resume && prompt != "" {
+		fatal(fmt.Errorf("--resume cannot be combined with --prompt"))
+	}
+	if resume {
+		if err := engine.Resume(ctx, os.Stdout); err != nil {
+			fatal(err)
+		}
+		return
+	}
 
 	if prompt != "" {
 		if err := engine.Run(ctx, prompt, os.Stdout); err != nil {
