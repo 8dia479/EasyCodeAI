@@ -314,7 +314,7 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 				return result.String(), err
 			}
 		}
-		return result.String(), nil
+		return "[checks-passed]\n" + result.String(), nil
 	}
 
 	pythonFiles, jsFiles := collectSourceFiles(r.ws.Root, map[string]bool{
@@ -342,9 +342,17 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 		}
 	}
 	if len(pythonFiles) == 0 && len(jsFiles) == 0 {
-		return "No safe automatic checks are currently available for this project. inspect_project reports detected languages and manifests. Go execution checks require --allow-project-execution.", nil
+		unsupportedPython, unsupportedJS := collectSourceFiles(r.ws.Root, map[string]bool{
+			".ts": true, ".tsx": true, ".java": true, ".kt": true, ".kts": true,
+			".rs": true, ".c": true, ".h": true, ".cc": true, ".cpp": true,
+			".hpp": true, ".cs": true,
+		})
+		if len(unsupportedPython)+len(unsupportedJS) > 0 {
+			return "[checks-unavailable] No safe checker is implemented for the detected source language(s). Do not claim automated tests passed.", nil
+		}
+		return "[checks-passed] No executable source files requiring syntax checks were found.\n", nil
 	}
-	return result.String(), nil
+	return "[checks-passed]\n" + result.String(), nil
 }
 
 func collectSourceFiles(root string, extensions map[string]bool) ([]string, []string) {
