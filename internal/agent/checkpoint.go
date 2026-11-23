@@ -54,6 +54,9 @@ func saveCheckpoint(cp Checkpoint) error {
 		return fmt.Errorf("create checkpoint directory: %w", err)
 	}
 	cp.Version = checkpointVersion
+	if len(cp.History) > 1000 {
+		cp.History = append([]string(nil), cp.History[len(cp.History)-1000:]...)
+	}
 	cp.UpdatedAt = time.Now().UTC()
 	data, err := json.MarshalIndent(cp, "", "  ")
 	if err != nil {
