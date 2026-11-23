@@ -119,6 +119,9 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 		if strings.TrimSpace(query) == "" {
 			return "", fmt.Errorf("query is required")
 		}
+		if len(query) > 512 {
+			return "", fmt.Errorf("search query exceeds 512 bytes")
+		}
 		return r.searchFiles(ctx, query)
 
 	case "read_file":
@@ -270,9 +273,14 @@ func (r *Registry) searchFiles(ctx context.Context, query string) (string, error
 		if readErr != nil || bytes.IndexByte(data, 0) >= 0 {
 			return nil
 		}
-		for lineNo, line := range strings.Split(string(data), "\n") {
+		for lineNo, line := range strings.Split(string(data), "
+") {
 			if strings.Contains(strings.ToLower(line), query) {
-				results = append(results, fmt.Sprintf("%s:%d: %s", rel, lineNo+1, strings.TrimSpace(line)))
+				line = strings.TrimSpace(line)
+				if len(line) > 1200 {
+					line = line[:1200] + "..."
+				}
+				results = append(results, fmt.Sprintf("%s:%d: %s", rel, lineNo+1, line))
 				if len(results) >= maxSearchResults {
 					break
 				}
