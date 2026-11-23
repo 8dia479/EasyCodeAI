@@ -126,10 +126,14 @@ func (m model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m.handleInput(line)
-		case tea.KeyBackspace, tea.KeyDelete:
+		case tea.KeyBackspace:
 			if m.cursor > 0 {
 				m.input = append(m.input[:m.cursor-1], m.input[m.cursor:]...)
 				m.cursor--
+			}
+		case tea.KeyDelete:
+			if m.cursor < len(m.input) {
+				m.input = append(m.input[:m.cursor], m.input[m.cursor+1:]...)
 			}
 		case tea.KeyLeft:
 			if m.cursor > 0 { m.cursor-- }
