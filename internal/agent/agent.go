@@ -247,7 +247,7 @@ func compactMessages(messages []nim.Message) []nim.Message {
 	const (
 		maxMessages = 100
 		keepRecent  = 80
-		maxBytes    = 8 << 20
+		maxBytes    = 1 << 20
 	)
 	if len(messages) <= 2 {
 		return messages
