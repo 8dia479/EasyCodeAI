@@ -52,6 +52,12 @@ Or give a one-shot task:
 easycode --workspace . --model "$NIM_MODEL" --prompt "Inspect this project, fix the failing tests, and verify the changes."
 ```
 
+Resume the most recently saved task in the same workspace:
+
+```sh
+easycode --workspace . --model "$NIM_MODEL" --resume
+```
+
 ## Environment variables
 
 - `NIM_API_KEY` — required; keep it out of source control
