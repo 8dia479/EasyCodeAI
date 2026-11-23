@@ -179,7 +179,7 @@ func safeGoEnv() []string {
 	allowed := map[string]bool{
 		"PATH": true, "HOME": true, "TMPDIR": true, "TMP": true, "TEMP": true,
 		"GOPATH": true, "GOMODCACHE": true, "GOCACHE": true, "GOTOOLCHAIN": true,
-		"GOPROXY": true, "GOSUMDB": true, "GOOS": true, "GOARCH": true,
+		"GOOS": true, "GOARCH": true,
 		"CGO_ENABLED": true, "CC": true, "CXX": true, "PKG_CONFIG": true,
 		"TERM": true, "LANG": true, "LC_ALL": true,
 	}
