@@ -264,9 +264,9 @@ func (r *Registry) searchFiles(ctx context.Context, query string) (string, error
 		if err != nil {
 			return nil
 		}
-		data, readErr := os.ReadFile(path)
+		data, readErr := io.ReadAll(io.LimitReader(file, (1<<20)+1))
 		_ = file.Close()
-		if readErr != nil || bytes.IndexByte(data, 0) >= 0 {
+		if readErr != nil || len(data) > 1<<20 || bytes.IndexByte(data, 0) >= 0 {
 			return nil
 		}
 		rel, err := filepath.Rel(r.ws.Root, path)
