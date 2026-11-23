@@ -49,7 +49,7 @@ Run `make check` to execute the race-enabled tests, vet, and build checks locall
 - `NIM_MODEL` — required unless passed with `--model`
 - `EASYCODE_WORKSPACE` — workspace path; defaults to current directory
 - `EASYCODE_STATE_DIR` — checkpoint directory; defaults to `~/.easycode`
-- `EASYCODE_SESSION` — optional named task session; can also be set with `--session`\n- `EASYCODE_SESSION` — optional named task session; can also be set with `--session`
+- `EASYCODE_SESSION` — optional named task session; can also be set with `--session`
 
 ## Current tools
 
@@ -72,4 +72,4 @@ The CLI interaction and agent architecture are informed by the public OpenCode p
 
 ## Development status
 
-Alpha0.1 is an early foundation. Recent hardening adds symlink-aware workspace path checks and regression tests, plus delivery of non-streaming NIM response text. After changes, EasyCodeAI requires a successful supported check or records that no safe checker is available before accepting completion. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), session listing/deletion and a richer terminal UI, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
+Alpha0.1 now includes the core Termux CLI workflow: NIM streaming/tool calls, project discovery, source search, guarded file writes, resumable named sessions, bounded context compaction, and verification-state tracking. Regression tests cover the main safety and recovery paths, but they still need to be executed on a machine with GitHub access. After changes, EasyCodeAI requires a successful supported check or records that no safe checker is available before accepting completion. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), session listing/deletion and a richer terminal UI, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
