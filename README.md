@@ -51,6 +51,37 @@ Run `make check` to execute the race-enabled tests, vet, and build checks locall
 - `EASYCODE_STATE_DIR` — checkpoint directory; defaults to `~/.easycode`
 - `EASYCODE_SESSION` — optional named task session; can also be set with `--session`
 
+## Run the agent
+
+Set your NVIDIA NIM credentials and model ID:
+
+```sh
+export NIM_API_KEY="your-api-key"
+export NIM_MODEL="your-nim-model-id"
+export NIM_BASE_URL="https://integrate.api.nvidia.com/v1"
+```
+
+Start an interactive session in the project directory:
+
+```sh
+cd /path/to/your/project
+easycode --workspace . --session my-project --allow-overwrite --allow-project-execution
+```
+
+Or submit a one-shot task:
+
+```sh
+easycode --workspace . --session my-project --allow-overwrite --allow-project-execution --max-rounds 40 --prompt "Inspect the project, implement the requested change, and verify it."
+```
+
+Resume that same task later with the same session name:
+
+```sh
+easycode --workspace . --session my-project --allow-overwrite --allow-project-execution --max-rounds 40 --resume
+```
+
+Omit `--allow-overwrite` to prevent replacement of existing files. Omit `--allow-project-execution` to keep Go tests/build disabled; Python and JavaScript syntax-only checks remain available.
+
 ## Current tools
 
 - `list_files` — list workspace entries
