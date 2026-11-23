@@ -114,10 +114,11 @@ func (w *Workspace) ReadFile(name string) (string, error) {
 
 func (w *Workspace) ReadFileLines(name string, startLine, endLine int) (string, error) {
 	const (
-		maxLines = 1000
-		maxBytes = 1 << 20
+		maxLines     = 1000
+		maxLineIndex = 10_000_000
+		maxBytes     = 1 << 20
 	)
-	if startLine < 1 || endLine < startLine || endLine-startLine+1 > maxLines {
+	if startLine < 1 || endLine < startLine || endLine-startLine+1 > maxLines || endLine > maxLineIndex {
 		return "", fmt.Errorf("line range must be within 1-%d lines", maxLines)
 	}
 	path, err := w.Resolve(name)
