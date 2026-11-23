@@ -49,13 +49,13 @@ Run inside the project you want the agent to work on:
 Or give a one-shot task:
 
 ```sh
-easycode --workspace . --model "$NIM_MODEL" --allow-overwrite --allow-project-execution --prompt "Inspect this project, fix the failing tests, and verify the changes."
+easycode --workspace . --session coffee-tycoon --model "$NIM_MODEL" --allow-overwrite --allow-project-execution --prompt "Inspect this project, fix the failing tests, and verify the changes."
 ```
 
 Resume the most recently saved task in the same workspace:
 
 ```sh
-easycode --workspace . --model "$NIM_MODEL" --allow-overwrite --allow-project-execution --max-rounds 40 --resume
+easycode --workspace . --session coffee-tycoon --model "$NIM_MODEL" --allow-overwrite --allow-project-execution --max-rounds 40 --resume
 ```
 
 ## Environment variables
@@ -64,7 +64,7 @@ easycode --workspace . --model "$NIM_MODEL" --allow-overwrite --allow-project-ex
 - `NIM_BASE_URL` — defaults to `https://integrate.api.nvidia.com/v1`
 - `NIM_MODEL` — required unless passed with `--model`
 - `EASYCODE_WORKSPACE` — workspace path; defaults to current directory
-- `EASYCODE_STATE_DIR` — checkpoint directory; defaults to `~/.easycode`
+- `EASYCODE_STATE_DIR` — checkpoint directory; defaults to `~/.easycode`\n- `EASYCODE_SESSION` — optional named task session; can also be set with `--session`
 
 ## Current tools
 
@@ -79,7 +79,7 @@ Use `--max-rounds N` (1–200) to set the model-round budget for each invocation
 
 The model does not receive arbitrary shell access. Python and JavaScript checks are syntax-only; Go tests/build can execute project code and require `--allow-project-execution`. All verification subprocesses have a five-minute timeout and a 1 MiB output cap.
 
-In interactive mode, `/resume` restores the saved conversation and continues from its last completed tool result; `/status` displays the checkpoint. Checkpoints are stored under `~/.easycode/checkpoint.json` (or `EASYCODE_STATE_DIR`) with owner-only file permissions. Only one active checkpoint is retained, and a saved task can only resume in its original workspace.
+In interactive mode, `/resume` restores the saved conversation, `/status` displays the current session, and `/help` lists commands. Checkpoints are stored with owner-only file permissions. The default session uses `checkpoint.json`; named sessions use isolated files under `sessions/`, allowing separate projects/tasks to be resumed independently. A saved task can only resume in its original workspace.
 
 ## OpenCode reference
 
@@ -87,4 +87,4 @@ The CLI interaction and agent architecture are informed by the public OpenCode p
 
 ## Development status
 
-Alpha0.1 is an early foundation. Recent hardening adds symlink-aware workspace path checks and regression tests, plus delivery of non-streaming NIM response text. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), multi-task session management, a richer terminal UI, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
+Alpha0.1 is an early foundation. Recent hardening adds symlink-aware workspace path checks and regression tests, plus delivery of non-streaming NIM response text. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), session listing/deletion and a richer terminal UI, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
