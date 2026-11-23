@@ -115,6 +115,7 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 			cmd := exec.CommandContext(checkCtx, "go", args...)
 			cmd.Dir = r.ws.Root
+			cmd.Env = safeGoEnv()
 			output := &limitedBuffer{max: 1 << 20}
 			cmd.Stdout = output
 			cmd.Stderr = output
@@ -171,4 +172,23 @@ func (b *limitedBuffer) String() string {
 		result += fmt.Sprintf("\n[output truncated at %d bytes]", b.max)
 	}
 	return result
+}
+
+
+func safeGoEnv() []string {
+	allowed := map[string]bool{
+		"PATH": true, "HOME": true, "TMPDIR": true, "TMP": true, "TEMP": true,
+		"GOPATH": true, "GOMODCACHE": true, "GOCACHE": true, "GOTOOLCHAIN": true,
+		"GOPROXY": true, "GOSUMDB": true, "GOOS": true, "GOARCH": true,
+		"CGO_ENABLED": true, "CC": true, "CXX": true, "PKG_CONFIG": true,
+		"TERM": true, "LANG": true, "LC_ALL": true,
+	}
+	var env []string
+	for _, item := range os.Environ() {
+		key, _, ok := strings.Cut(item, "=")
+		if ok && allowed[key] {
+			env = append(env, item)
+		}
+	}
+	return env
 }
