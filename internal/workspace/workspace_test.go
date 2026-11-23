@@ -81,6 +81,9 @@ func TestWriteFilePreservesModeAndReplacesContents(t *testing.T) {
 	if err := os.WriteFile(path, []byte("old"), 0o750); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chmod(path, 0o750); err != nil {
+		t.Fatal(err)
+	}
 	if err := ws.WriteFile("existing.txt", "new content"); err != nil {
 		t.Fatal(err)
 	}
