@@ -61,7 +61,7 @@ export NIM_MODEL="your-nim-model-id"
 export NIM_BASE_URL="https://integrate.api.nvidia.com/v1"
 ```
 
-Start an interactive session in the project directory:
+Start the OpenCode-inspired full-screen terminal UI in the project directory:
 
 ```sh
 cd /path/to/your/project
@@ -95,7 +95,7 @@ Use `--max-rounds N` (1–200) to set the model-round budget for each invocation
 
 The model does not receive arbitrary shell access. Existing files are backed up under the EasyCodeAI state directory before an allowed replacement (up to 16 MiB per source file). Large files can be inspected in line ranges of up to 1000 lines per call. Python and JavaScript checks are syntax-only; Go tests/build can execute project code and require `--allow-project-execution`. All verification subprocesses have a five-minute timeout and a 1 MiB output cap.
 
-In interactive mode, `/resume` restores the saved conversation, `/status` displays the current session, and `/help` lists commands. Checkpoints are stored with owner-only file permissions. The default session uses `checkpoint.json`; named sessions use isolated files under `sessions/`, allowing separate projects/tasks to be resumed independently. Select the same `--session` name to resume a task later. A saved task can only resume in its original workspace.
+The default interactive mode is a full-screen terminal UI: the header shows the active model and workspace, the main pane streams agent responses and tool activity, and the footer shows task state. Type a task and press Enter. Commands: `/help`, `/resume`, `/status`, `/model [ID]`, `/workspace`, `/clear`, and `/exit`. Press Tab to complete slash commands. While a task is running, Ctrl+C cancels it and preserves its checkpoint; while idle, Ctrl+C exits. Arrow keys edit the prompt or scroll the log. Checkpoints are stored with owner-only file permissions. The default session uses `checkpoint.json`; named sessions use isolated files under `sessions/`, allowing separate projects/tasks to be resumed independently. Select the same `--session` name to resume a task later. A saved task can only resume in its original workspace.
 
 ## OpenCode reference
 
@@ -103,4 +103,4 @@ The CLI interaction and agent architecture are informed by the public OpenCode p
 
 ## Development status
 
-Alpha0.1 now includes the core Termux CLI workflow: NIM streaming/tool calls, project discovery, source search, guarded file writes, resumable named sessions, bounded context compaction, and verification-state tracking. Regression tests cover the main safety and recovery paths, but they still need to be executed on a machine with GitHub access. After changes, EasyCodeAI requires a successful supported check or records that no safe checker is available before accepting completion. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), session listing/deletion and a richer terminal UI, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
+Alpha0.1 now includes the core Termux CLI workflow: NIM streaming/tool calls, project discovery, source search, guarded file writes, resumable named sessions, bounded context compaction, and verification-state tracking. Regression tests cover the main safety and recovery paths, but they still need to be executed on a machine with GitHub access. After changes, EasyCodeAI requires a successful supported check or records that no safe checker is available before accepting completion. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), session listing/deletion, richer tool cards and approval prompts, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
