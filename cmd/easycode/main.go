@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
-	"strings"
 	"syscall"
 
 	"github.com/8dia479/EasyCodeAI/internal/agent"
