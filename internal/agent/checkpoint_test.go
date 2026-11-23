@@ -11,6 +11,7 @@ import (
 func TestCheckpointRoundTripPreservesConversation(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("EASYCODE_STATE_DIR", dir)
+	t.Setenv("EASYCODE_SESSION", "default")
 
 	want := Checkpoint{
 		Task:      "repair the failing test",
@@ -62,6 +63,7 @@ func TestCheckpointRoundTripPreservesConversation(t *testing.T) {
 func TestLoadCheckpointRejectsLegacyOrIncompleteState(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("EASYCODE_STATE_DIR", dir)
+	t.Setenv("EASYCODE_SESSION", "default")
 	path := filepath.Join(dir, "checkpoint.json")
 	if err := os.WriteFile(path, []byte(`{"task":"old task","phase":"interrupted"}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -75,6 +77,7 @@ func TestLoadCheckpointRejectsLegacyOrIncompleteState(t *testing.T) {
 func TestLoadCheckpointMigratesLegacyModifiedTaskSafely(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("EASYCODE_STATE_DIR", dir)
+	t.Setenv("EASYCODE_SESSION", "default")
 	legacy := `{
 		"version": 1,
 		"task": "update source",
