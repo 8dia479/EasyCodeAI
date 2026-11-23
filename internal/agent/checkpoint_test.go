@@ -97,3 +97,24 @@ func TestLoadCheckpointMigratesLegacyModifiedTaskSafely(t *testing.T) {
 		t.Fatalf("legacy checkpoint migration = %+v", cp)
 	}
 }
+
+
+func TestNamedSessionsUseSeparateCheckpointFiles(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EASYCODE_STATE_DIR", dir)
+	t.Setenv("EASYCODE_SESSION", "alpha")
+	alpha := statePath()
+	t.Setenv("EASYCODE_SESSION", "beta")
+	beta := statePath()
+	t.Setenv("EASYCODE_SESSION", "default")
+	def := statePath()
+	if alpha == beta || alpha == def || beta == def {
+		t.Fatalf("session paths are not isolated: alpha=%q beta=%q default=%q", alpha, beta, def)
+	}
+	if filepath.Dir(alpha) != filepath.Join(dir, "sessions") {
+		t.Fatalf("named session path = %q, want sessions directory", alpha)
+	}
+	if filepath.Base(def) != "checkpoint.json" {
+		t.Fatalf("default session path = %q, want checkpoint.json", def)
+	}
+}
