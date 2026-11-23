@@ -34,7 +34,7 @@ cd EasyCodeAI
 bash scripts/install-termux.sh
 ```
 
-The installer builds the CLI and installs it to `$PREFIX/bin/easycode`. For a manual build:
+The installer builds the CLI and installs it to `$PREFIX/bin/easycode`. Run `easycode --doctor` to check the local Go/Python/Node tools and NIM configuration without sending an API request. For a manual build:
 
 ```sh
 go build -trimpath -o easycode ./cmd/easycode
