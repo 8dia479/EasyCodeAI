@@ -22,3 +22,16 @@ func TestLimitedBufferDoesNotMarkShortOutputAsTruncated(t *testing.T) {
 		t.Fatalf("unexpected truncation marker: %q", got)
 	}
 }
+
+
+func TestSafeGoEnvExcludesNIMCredentials(t *testing.T) {
+	t.Setenv("NIM_API_KEY", "do-not-pass-this")
+	t.Setenv("NIM_MODEL", "private-model")
+	env := strings.Join(safeGoEnv(), "\n")
+	if strings.Contains(env, "NIM_API_KEY=") || strings.Contains(env, "NIM_MODEL=") {
+		t.Fatalf("NIM credentials leaked into project check environment: %q", env)
+	}
+	if !strings.Contains(env, "PATH=") {
+		t.Fatal("safe project environment is missing PATH")
+	}
+}
