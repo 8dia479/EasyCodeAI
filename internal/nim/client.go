@@ -119,7 +119,10 @@ func (c *Client) Complete(ctx context.Context, messages []Message, tools []ToolS
 			break
 		}
 
-		delay := retryDelay(resp.Header.Get("Retry-After"), attempt)
+		delay, retryAllowed := retryDelay(resp.Header.Get("Retry-After"), attempt)
+		if !retryAllowed {
+			break
+		}
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 		_ = resp.Body.Close()
 		select {
@@ -220,27 +223,26 @@ func isRetryableStatus(status int) bool {
 	}
 }
 
-func retryDelay(retryAfter string, attempt int) time.Duration {
-	if seconds, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && seconds >= 0 {
-		delay := time.Duration(seconds) * time.Second
-		if delay > 30*time.Second {
-			return 30 * time.Second
+func retryDelay(retryAfter string, attempt int) (time.Duration, bool) {
+	if seconds, err := strconv.ParseInt(strings.TrimSpace(retryAfter), 10, 64); err == nil && seconds >= 0 {
+		if seconds > 120 {
+			return 0, false
 		}
-		return delay
+		return time.Duration(seconds) * time.Second, true
 	}
 	if when, err := http.ParseTime(retryAfter); err == nil {
 		delay := time.Until(when)
 		if delay < 0 {
-			return 0
+			delay = 0
 		}
-		if delay > 30*time.Second {
-			return 30 * time.Second
+		if delay > 120*time.Second {
+			return 0, false
 		}
-		return delay
+		return delay, true
 	}
 	delay := time.Duration(1<<attempt) * time.Second
 	if delay > 8*time.Second {
-		return 8 * time.Second
+		delay = 8 * time.Second
 	}
-	return delay
+	return delay, true
 }
