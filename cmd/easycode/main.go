@@ -6,10 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
-	"os/exec"
-	"runtime"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 
