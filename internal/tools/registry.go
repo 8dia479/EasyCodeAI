@@ -316,6 +316,9 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 		if !r.allowProjectExecution {
 			return "", fmt.Errorf("Go tests/build can execute code from this project; rerun with --allow-project-execution to enable them")
 		}
+		if _, err := exec.LookPath("go"); err != nil {
+			return "[checks-unavailable] Go toolchain is not installed in PATH.", nil
+		}
 		checks := [][]string{{"test", "./..."}, {"vet", "./..."}, {"build", "./..."}}
 		for _, args := range checks {
 			output, err := runBounded(ctx, r.ws.Root, "go", args...)
@@ -342,19 +345,24 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 		python := "python"
 		if _, err := exec.LookPath("python3"); err == nil {
 			python = "python3"
+		} else if _, err := exec.LookPath("python"); err != nil {
+			return "[checks-unavailable] Python interpreter is not installed in PATH.", nil
 		}
 		output, err := runBounded(ctx, r.ws.Root, python, append([]string{"-c", script}, pythonFiles...)...)
 		fmt.Fprintf(&result, "$ python syntax check (%d files)\n%s\n", len(pythonFiles), output)
 		if err != nil {
-			return result.String(), fmt.Errorf("Python syntax check failed or Python is unavailable: %w", err)
+			return result.String(), fmt.Errorf("Python syntax check failed: %w", err)
 		}
 	}
 	if len(jsFiles) > 0 {
+		if _, err := exec.LookPath("node"); err != nil {
+			return "[checks-unavailable] Node.js is not installed in PATH.", nil
+		}
 		for _, path := range jsFiles {
 			output, err := runBounded(ctx, r.ws.Root, "node", "--check", "./"+filepath.ToSlash(path))
 			fmt.Fprintf(&result, "$ node --check %s\n%s\n", path, output)
 			if err != nil {
-				return result.String(), fmt.Errorf("JavaScript syntax check failed or Node.js is unavailable: %w", err)
+				return result.String(), fmt.Errorf("JavaScript syntax check failed: %w", err)
 			}
 		}
 	}
