@@ -8,9 +8,9 @@
 - Added interactive `/resume` and `/status` commands, plus the one-shot `--resume` flag.
 - Resume validates that the saved task belongs to the current workspace and refuses to restart a completed task.
 - Pending tool calls are recovered on resume; already persisted tool results are not executed again.
-- A resumed task receives another bounded execution window instead of immediately hitting the previous round limit.
-- Added NIM retry handling for HTTP 429, 502, 503, and 504 responses, honoring Retry-After and using bounded exponential fallback delays.
-- Made workspace writes atomic, preserved existing file permissions, and limited individual writes to 4 MiB.
+- A resumed task receives another bounded execution window instead of immediately hitting the previous round limit; `--max-rounds` configures each invocation (1–200).
+- Added NIM retry handling for HTTP 429, 502, 503, and 504 responses, honoring short Retry-After values without retrying ahead of long server delays and using bounded exponential fallback delays.
+- Made workspace writes atomic, preserved existing file permissions, and limited individual writes to 4 MiB.\n- Added per-command verification timeouts and output caps, and filtered sensitive environment variables from test/build subprocesses.
 - Added five-minute timeouts and 1 MiB output limits to each fixed Go verification command.
 - Filtered project-check environment variables so NIM API credentials and model settings are not inherited by test/build processes.
 - Added regression tests for checkpoint serialization, resume workspace isolation, retry behavior, output limits, secret filtering, and atomic workspace writes.
