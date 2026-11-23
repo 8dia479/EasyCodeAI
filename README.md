@@ -8,7 +8,7 @@ A Termux-first, OpenAI-compatible coding agent powered by NVIDIA NIM.
 
 - Run directly in Termux; no desktop runtime or hosted agent server.
 - Use NVIDIA NIM's OpenAI-compatible API.
-- Stream each inference response and batch multiple tool calls into one model turn where supported.
+- Stream each inference response, batch multiple tool calls into one model turn where supported, and retry transient 429/502/503/504 responses with bounded backoff.
 - Persist the full model conversation, assistant tool calls, and tool results so interrupted tasks can be resumed.
 - Keep file access inside the selected workspace.
 - Iterate through inspect → plan → edit → test → repair.
