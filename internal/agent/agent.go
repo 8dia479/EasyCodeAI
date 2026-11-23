@@ -80,7 +80,8 @@ func (a *Agent) runLoop(ctx context.Context, cp Checkpoint, out io.Writer) error
 		return err
 	}
 
-	for round := cp.Round + 1; round <= a.opts.MaxRounds; round++ {
+	maxRound := cp.Round + a.opts.MaxRounds
+	for round := cp.Round + 1; round <= maxRound; round++ {
 		cp.Round = round
 		cp.Phase = fmt.Sprintf("model_round_%d", round)
 		cp.History = append(cp.History, cp.Phase)
@@ -88,7 +89,7 @@ func (a *Agent) runLoop(ctx context.Context, cp Checkpoint, out io.Writer) error
 			return err
 		}
 
-		fmt.Fprintf(out, "\n\x1b[36m[EasyCodeAI · round %d/%d]\x1b[0m\n", round, a.opts.MaxRounds)
+		fmt.Fprintf(out, "\n\x1b[36m[EasyCodeAI · round %d/%d]\x1b[0m\n", round, maxRound)
 		reply, err := a.client.Complete(ctx, cp.Messages, specs, func(s string) {
 			_, _ = io.WriteString(out, s)
 		})
@@ -128,7 +129,7 @@ func (a *Agent) runLoop(ctx context.Context, cp Checkpoint, out io.Writer) error
 
 	cp.Phase = "round_limit"
 	_ = saveCheckpoint(cp)
-	return fmt.Errorf("reached %d-round safety limit; checkpoint saved; run /resume or increase MaxRounds", a.opts.MaxRounds)
+	return fmt.Errorf("reached %d-round execution budget; checkpoint saved; run /resume to continue", a.opts.MaxRounds)
 }
 
 func (a *Agent) executePendingTools(ctx context.Context, cp *Checkpoint, out io.Writer) error {
