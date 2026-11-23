@@ -2,14 +2,18 @@ package tools
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 	"sync"
 	"time"
 
@@ -141,13 +145,23 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 		if err != nil {
 			return "", err
 		}
-		if _, err := os.Lstat(resolved); err == nil && !r.allowFileOverwrite {
-			return "", fmt.Errorf("refusing to replace existing file %q; rerun with --allow-overwrite to permit modifications", path)
-		} else if err != nil && !os.IsNotExist(err) {
+		backupPath := ""
+		if _, err := os.Lstat(resolved); err == nil {
+			if !r.allowFileOverwrite {
+				return "", fmt.Errorf("refusing to replace existing file %q; rerun with --allow-overwrite to permit modifications", path)
+			}
+			backupPath, err = backupExistingFile(resolved)
+			if err != nil {
+				return "", fmt.Errorf("create safety backup before replacing %q: %w", path, err)
+			}
+		} else if !os.IsNotExist(err) {
 			return "", err
 		}
 		if err := r.ws.WriteFile(path, value); err != nil {
 			return "", err
+		}
+		if backupPath != "" {
+			return "Wrote " + filepath.Clean(path) + " (previous version backed up to " + backupPath + ")", nil
 		}
 		return "Wrote " + filepath.Clean(path), nil
 
@@ -503,4 +517,69 @@ func safeGoEnv() []string {
 		}
 	}
 	return env
+}
+
+
+func backupExistingFile(sourcePath string) (string, error) {
+	const maxBackupSize = 16 << 20
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return "", err
+	}
+	defer source.Close()
+	info, err := source.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("refusing to back up a non-regular file")
+	}
+	if info.Size() > maxBackupSize {
+		return "", fmt.Errorf("existing file exceeds the %d MiB backup limit", maxBackupSize>>20)
+	}
+
+	stateDir := os.Getenv("EASYCODE_STATE_DIR")
+	if stateDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		stateDir = filepath.Join(home, ".easycode")
+	}
+	session := os.Getenv("EASYCODE_SESSION")
+	sessionHash := sha256.Sum256([]byte(session))
+	backupDir := filepath.Join(stateDir, "backups", hex.EncodeToString(sessionHash[:8]))
+	if err := os.MkdirAll(backupDir, 0o700); err != nil {
+		return "", err
+	}
+	backup, err := os.CreateTemp(backupDir, "before-write-*.bak")
+	if err != nil {
+		return "", err
+	}
+	backupPath := backup.Name()
+	ok := false
+	defer func() {
+		_ = backup.Close()
+		if !ok {
+			_ = os.Remove(backupPath)
+		}
+	}()
+	if err := backup.Chmod(0o600); err != nil {
+		return "", err
+	}
+	written, err := io.Copy(backup, io.LimitReader(source, maxBackupSize+1))
+	if err != nil {
+		return "", err
+	}
+	if written != info.Size() {
+		return "", fmt.Errorf("source changed while creating backup")
+	}
+	if err := backup.Sync(); err != nil {
+		return "", err
+	}
+	if err := backup.Close(); err != nil {
+		return "", err
+	}
+	ok = true
+	return backupPath, nil
 }
