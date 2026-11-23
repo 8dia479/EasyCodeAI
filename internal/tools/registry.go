@@ -40,6 +40,10 @@ func str(description string) map[string]any {
 	return map[string]any{"type": "string", "description": description}
 }
 
+func integer(description string) map[string]any {
+	return map[string]any{"type": "integer", "description": description}
+}
+
 func schema(props map[string]any, required ...string) map[string]any {
 	return map[string]any{
 		"type": "object", "properties": props, "required": required,
@@ -62,8 +66,12 @@ func (r *Registry) Specs() []nim.ToolSpec {
 			Parameters: schema(map[string]any{"query": str("text to find")}, "query"),
 		}},
 		{Type: "function", Function: nim.ToolFunctionSpec{
-			Name: "read_file", Description: "Read a text file inside workspace (up to 1 MiB).",
-			Parameters: schema(map[string]any{"path": str("relative file path")}, "path"),
+			Name: "read_file", Description: "Read a text file inside workspace (up to 1 MiB), or request a bounded line range for larger files.",
+			Parameters: schema(map[string]any{
+				"path": str("relative file path"),
+				"start_line": integer("optional first line, one-based"),
+				"end_line": integer("optional last line, inclusive; at most 1000 lines per call"),
+			}, "path"),
 		}},
 		{Type: "function", Function: nim.ToolFunctionSpec{
 			Name: "write_file", Description: "Create or replace a text file inside workspace. Replacing an existing file requires the user to enable --allow-overwrite.",
@@ -132,6 +140,24 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 		if path == "" {
 			return "", fmt.Errorf("path is required")
 		}
+		if _, hasStart := input["start_line"]; hasStart {
+			startLine, err := intArgument(input, "start_line", 1)
+			if err != nil {
+				return "", err
+			}
+			endLine, err := intArgument(input, "end_line", startLine+999)
+			if err != nil {
+				return "", err
+			}
+			return r.ws.ReadFileLines(path, startLine, endLine)
+		}
+		if _, hasEnd := input["end_line"]; hasEnd {
+			endLine, err := intArgument(input, "end_line", 1000)
+			if err != nil {
+				return "", err
+			}
+			return r.ws.ReadFileLines(path, 1, endLine)
+		}
 		return r.ws.ReadFile(path)
 
 	case "write_file":
@@ -170,6 +196,19 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
+}
+
+
+func intArgument(input map[string]any, name string, defaultValue int) (int, error) {
+	value, exists := input[name]
+	if !exists {
+		return defaultValue, nil
+	}
+	number, ok := value.(float64)
+	if !ok || number < 1 || number > 1_000_000_000 || number != float64(int(number)) {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return int(number), nil
 }
 
 func (r *Registry) inspectProject() (string, error) {
