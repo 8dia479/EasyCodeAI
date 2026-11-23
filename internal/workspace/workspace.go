@@ -94,6 +94,10 @@ func (w *Workspace) ReadFile(name string) (string, error) {
 }
 
 func (w *Workspace) WriteFile(name, content string) error {
+	const maxFileSize = 4 << 20
+	if len(content) > maxFileSize {
+		return fmt.Errorf("file content exceeds the %d MiB write limit", maxFileSize>>20)
+	}
 	path, err := w.Resolve(name)
 	if err != nil {
 		return err
@@ -106,5 +110,49 @@ func (w *Workspace) WriteFile(name, content string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
+
+	mode := os.FileMode(0o644)
+	if info, statErr := os.Stat(path); statErr == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("refusing to replace non-regular file: %s", name)
+		}
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(statErr) {
+		return statErr
+	}
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".easycode-write-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(mode); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.WriteString(content); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+
+	// Check containment once more immediately before the atomic replacement.
+	verified, err := w.Resolve(name)
+	if err != nil {
+		return err
+	}
+	if verified != path {
+		return fmt.Errorf("workspace path changed while writing: %s", name)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("replace %s: %w", name, err)
+	}
+	return nil
 }
