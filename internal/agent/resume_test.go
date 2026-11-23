@@ -92,6 +92,7 @@ func TestCanCompleteRequiresChecksAfterModifications(t *testing.T) {
 func TestRunDoesNotOverwriteUnfinishedSession(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("EASYCODE_STATE_DIR", dir)
+	t.Setenv("EASYCODE_SESSION", "default")
 	projectDir := t.TempDir()
 	ws, err := workspace.New(projectDir)
 	if err != nil {
