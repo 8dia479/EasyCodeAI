@@ -9,7 +9,7 @@ A Termux-first, OpenAI-compatible coding agent powered by NVIDIA NIM.
 - Run directly in Termux; no desktop runtime or hosted agent server.
 - Use NVIDIA NIM's OpenAI-compatible API.
 - Stream each inference response and batch multiple tool calls into one model turn where supported.
-- Persist progress so interrupted tasks can be inspected and resumed.
+- Persist task progress so interrupted work can be inspected; automatic conversation restoration is still pending.
 - Keep file access inside the selected workspace.
 - Iterate through inspect → plan → edit → test → repair.
 
@@ -75,4 +75,4 @@ The CLI interaction and agent architecture are informed by the public OpenCode p
 
 ## Development status
 
-Alpha0.1 is an early foundation. Remaining work includes cross-language project checks, stronger symlink-aware workspace isolation, tool-call recovery after partial streams, explicit approval controls, a richer terminal UI, and queue-aware retry/backoff based on observed NIM behavior.
+Alpha0.1 is an early foundation. Recent hardening adds symlink-aware workspace path checks and regression tests, plus delivery of non-streaming NIM response text. Remaining work includes automatic conversation restoration, race-free filesystem access (the current path checks cannot eliminate filesystem TOCTOU races), cross-language project checks, tool-call recovery after partial streams, explicit approval controls, a richer terminal UI, and queue-aware retry/backoff based on observed NIM behavior. CI is configured for race-enabled tests, vet, and build; the latest run has not yet been independently verified.
