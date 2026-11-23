@@ -25,38 +25,22 @@ EasyCodeAI batches all tool calls returned in one assistant response, executes t
 
 ## Build and run
 
+On Termux, install the prerequisites and run the included installer:
+
 ```sh
-git clone https://github.com/8dia479/EasyCodeAI.git
+pkg install git golang
+git clone --branch Alpha0.1 https://github.com/8dia479/EasyCodeAI.git
 cd EasyCodeAI
-git switch Alpha0.1
-go build -o easycode ./cmd/easycode
+bash scripts/install-termux.sh
 ```
 
-Set the API configuration:
+The installer builds the CLI and installs it to `$PREFIX/bin/easycode`. For a manual build:
 
 ```sh
-export NIM_API_KEY="..."
-export NIM_BASE_URL="https://integrate.api.nvidia.com/v1"
-export NIM_MODEL="your/nim-model-id"
+go build -trimpath -o easycode ./cmd/easycode
 ```
 
-Run inside the project you want the agent to work on:
-
-```sh
-/path/to/EasyCodeAI/easycode
-```
-
-Or give a one-shot task:
-
-```sh
-easycode --workspace . --session coffee-tycoon --model "$NIM_MODEL" --allow-overwrite --allow-project-execution --prompt "Inspect this project, fix the failing tests, and verify the changes."
-```
-
-Resume the most recently saved task in the same workspace:
-
-```sh
-easycode --workspace . --session coffee-tycoon --model "$NIM_MODEL" --allow-overwrite --allow-project-execution --max-rounds 40 --resume
-```
+Run `make check` to execute the race-enabled tests, vet, and build checks locally.
 
 ## Environment variables
 
