@@ -37,6 +37,13 @@ func (a *Agent) Run(ctx context.Context, task string, out io.Writer) error {
 	if strings.TrimSpace(task) == "" {
 		return fmt.Errorf("task cannot be empty")
 	}
+	if existing, err := loadCheckpoint(); err == nil {
+		if existing.Phase != "completed" {
+			return fmt.Errorf("session already contains an unfinished task (%s); use /resume or start with a different --session", existing.Phase)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("refusing to replace an unreadable checkpoint: %w", err)
+	}
 	cp := Checkpoint{
 		Task:      task,
 		Session:   os.Getenv("EASYCODE_SESSION"),
