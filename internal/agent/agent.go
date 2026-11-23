@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -38,6 +39,7 @@ func (a *Agent) Run(ctx context.Context, task string, out io.Writer) error {
 	}
 	cp := Checkpoint{
 		Task:      task,
+		Session:   os.Getenv("EASYCODE_SESSION"),
 		Workspace: a.ws.Root,
 		Phase:     "starting",
 		Messages: []nim.Message{
@@ -219,6 +221,11 @@ func (a *Agent) executePendingTools(ctx context.Context, cp *Checkpoint, out io.
 	return nil
 }
 
+func sessionLabel(value string) string {
+	if value == "" { return "default" }
+	return value
+}
+
 func canComplete(cp Checkpoint) bool {
 	return !cp.Modified || cp.Verification == "passed" || cp.Verification == "unavailable"
 }
@@ -235,8 +242,8 @@ func (a *Agent) ShowCheckpoint(out io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("no saved checkpoint: %w", err)
 	}
-	fmt.Fprintf(out, "Task: %s\nWorkspace: %s\nPhase: %s\nRound: %d\nUpdated: %s\n",
-		cp.Task, cp.Workspace, cp.Phase, cp.Round, cp.UpdatedAt.Format("2006-01-02 15:04:05 MST"))
+	fmt.Fprintf(out, "Task: %s\nSession: %s\nWorkspace: %s\nPhase: %s\nRound: %d\nVerification: %s\nUpdated: %s\n",
+		cp.Task, sessionLabel(cp.Session), cp.Workspace, cp.Phase, cp.Round, cp.Verification, cp.UpdatedAt.Format("2006-01-02 15:04:05 MST"))
 	for _, item := range cp.History {
 		fmt.Fprintln(out, " -", item)
 	}
