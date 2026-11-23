@@ -70,3 +70,30 @@ func TestLoadCheckpointRejectsLegacyOrIncompleteState(t *testing.T) {
 		t.Fatal("loadCheckpoint() accepted a legacy non-resumable checkpoint")
 	}
 }
+
+
+func TestLoadCheckpointMigratesLegacyModifiedTaskSafely(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("EASYCODE_STATE_DIR", dir)
+	legacy := `{
+		"version": 1,
+		"task": "update source",
+		"workspace": "/tmp/project",
+		"phase": "interrupted",
+		"history": ["tool write_file: Wrote main.go"],
+		"messages": [
+			{"role":"system","content":"system"},
+			{"role":"user","content":"update source"}
+		]
+	}`
+	if err := os.WriteFile(filepath.Join(dir, "checkpoint.json"), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cp, err := loadCheckpoint()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cp.Version != checkpointVersion || !cp.Modified || cp.Verification != "not-run" {
+		t.Fatalf("legacy checkpoint migration = %+v", cp)
+	}
+}
