@@ -320,6 +320,13 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 	pythonFiles, jsFiles := collectSourceFiles(r.ws.Root, map[string]bool{
 		".py": true, ".js": true, ".mjs": true, ".cjs": true,
 	})
+	unsupportedPython, unsupportedJS := collectSourceFiles(r.ws.Root, map[string]bool{
+		".go": true, ".jsx": true, ".ts": true, ".tsx": true, ".java": true,
+		".kt": true, ".kts": true, ".rs": true, ".c": true, ".h": true,
+		".cc": true, ".cpp": true, ".hpp": true, ".cs": true, ".php": true,
+		".rb": true, ".swift": true, ".dart": true, ".scala": true, ".lua": true,
+		".sh": true, ".html": true, ".css": true,
+	})
 	if len(pythonFiles) > 0 {
 		script := "import ast,pathlib,sys; files=[pathlib.Path(p) for p in sys.argv[1:]]; [(ast.parse(p.read_text(encoding='utf-8'), filename=str(p))) for p in files]"
 		python := "python"
@@ -342,15 +349,13 @@ func (r *Registry) runChecks(ctx context.Context) (string, error) {
 		}
 	}
 	if len(pythonFiles) == 0 && len(jsFiles) == 0 {
-		unsupportedPython, unsupportedJS := collectSourceFiles(r.ws.Root, map[string]bool{
-			".ts": true, ".tsx": true, ".java": true, ".kt": true, ".kts": true,
-			".rs": true, ".c": true, ".h": true, ".cc": true, ".cpp": true,
-			".hpp": true, ".cs": true,
-		})
 		if len(unsupportedPython)+len(unsupportedJS) > 0 {
 			return "[checks-unavailable] No safe checker is implemented for the detected source language(s). Do not claim automated tests passed.", nil
 		}
 		return "[checks-passed] No executable source files requiring syntax checks were found.\n", nil
+	}
+	if len(unsupportedPython)+len(unsupportedJS) > 0 {
+		return "[checks-unavailable] Supported Python/JavaScript syntax checks passed, but this project also contains source languages without a safe checker. Do not claim the whole project was verified.", nil
 	}
 	return "[checks-passed]\n" + result.String(), nil
 }
