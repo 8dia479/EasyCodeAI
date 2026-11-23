@@ -100,6 +100,14 @@ func (a *Agent) runLoop(ctx context.Context, cp Checkpoint, out io.Writer) error
 			return err
 		}
 
+		beforeCompaction := len(cp.Messages)
+		cp.Messages = compactMessages(cp.Messages)
+		if len(cp.Messages) != beforeCompaction {
+			cp.History = append(cp.History, "conversation context compacted")
+			if err := saveCheckpoint(cp); err != nil {
+				return err
+			}
+		}
 		fmt.Fprintf(out, "\n\x1b[36m[EasyCodeAI · round %d/%d]\x1b[0m\n", round, maxRound)
 		reply, err := a.client.Complete(ctx, cp.Messages, specs, func(s string) {
 			_, _ = io.WriteString(out, s)
@@ -226,6 +234,66 @@ func (a *Agent) executePendingTools(ctx context.Context, cp *Checkpoint, out io.
 		fmt.Fprintln(out, result)
 	}
 	return nil
+}
+
+func compactMessages(messages []nim.Message) []nim.Message {
+	const (
+		maxMessages = 100
+		keepRecent  = 80
+		maxBytes    = 8 << 20
+	)
+	if len(messages) <= 2 {
+		return messages
+	}
+	total := 0
+	for _, message := range messages {
+		total += len(message.Role) + len(message.Content) + len(message.ToolCallID)
+		for _, call := range message.ToolCalls {
+			total += len(call.ID) + len(call.Type) + len(call.Function.Name) + len(call.Function.Arguments)
+		}
+	}
+	if len(messages) <= maxMessages && total <= maxBytes {
+		return messages
+	}
+
+	candidate := len(messages) - keepRecent
+	if candidate < 2 {
+		candidate = 2
+	}
+	if total > maxBytes {
+		recentBytes := 0
+		for i := len(messages) - 1; i >= 2; i-- {
+			message := messages[i]
+			size := len(message.Role) + len(message.Content) + len(message.ToolCallID)
+			for _, call := range message.ToolCalls {
+				size += len(call.ID) + len(call.Type) + len(call.Function.Name) + len(call.Function.Arguments)
+			}
+			recentBytes += size
+			if recentBytes > maxBytes*3/4 {
+				candidate = i
+				break
+			}
+		}
+	}
+	start := -1
+	for i := candidate; i < len(messages); i++ {
+		if messages[i].Role == "user" || (messages[i].Role == "assistant" && len(messages[i].ToolCalls) == 0) {
+			start = i
+			break
+		}
+	}
+	if start < 2 {
+		return messages
+	}
+
+	compacted := make([]nim.Message, 0, len(messages)-start+3)
+	compacted = append(compacted, messages[0], messages[1])
+	compacted = append(compacted, nim.Message{
+		Role: "user",
+		Content: "[Context note: older conversation messages were compacted to fit the model context. The original task is preserved above. Re-inspect current workspace files and rely on the current source state rather than assuming omitted conversation details.]",
+	})
+	compacted = append(compacted, messages[start:]...)
+	return compacted
 }
 
 func sessionLabel(value string) string {
