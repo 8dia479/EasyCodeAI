@@ -65,3 +65,25 @@ func TestResumeRejectsCompletedTask(t *testing.T) {
 		t.Fatalf("Resume() error = %v, want completed-task error", err)
 	}
 }
+
+
+func TestCanCompleteRequiresChecksAfterModifications(t *testing.T) {
+	cases := []struct {
+		name string
+		cp   Checkpoint
+		want bool
+	}{
+		{name: "no changes", cp: Checkpoint{}, want: true},
+		{name: "modified but not checked", cp: Checkpoint{Modified: true, Verification: "not-run"}, want: false},
+		{name: "checks failed", cp: Checkpoint{Modified: true, Verification: "failed"}, want: false},
+		{name: "checks passed", cp: Checkpoint{Modified: true, Verification: "passed"}, want: true},
+		{name: "checker unavailable", cp: Checkpoint{Modified: true, Verification: "unavailable"}, want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := canComplete(tc.cp); got != tc.want {
+				t.Fatalf("canComplete() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
