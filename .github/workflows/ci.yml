@@ -26,6 +26,8 @@ jobs:
         run: go build ./...
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
       - name: Install Android NDK r27c
         run: sdkmanager "ndk;27.2.12479018"
       - name: Cross-build Termux ARMv7 binary
