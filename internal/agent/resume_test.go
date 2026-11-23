@@ -13,6 +13,7 @@ import (
 func TestResumeRejectsDifferentWorkspace(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("EASYCODE_STATE_DIR", stateDir)
+	t.Setenv("EASYCODE_SESSION", "default")
 	projectDir := t.TempDir()
 	ws, err := workspace.New(projectDir)
 	if err != nil {
@@ -42,6 +43,7 @@ func TestResumeRejectsDifferentWorkspace(t *testing.T) {
 func TestResumeRejectsCompletedTask(t *testing.T) {
 	stateDir := t.TempDir()
 	t.Setenv("EASYCODE_STATE_DIR", stateDir)
+	t.Setenv("EASYCODE_SESSION", "default")
 	projectDir := t.TempDir()
 	ws, err := workspace.New(projectDir)
 	if err != nil {
