@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -16,12 +17,20 @@ import (
 	"github.com/8dia479/EasyCodeAI/internal/workspace"
 )
 
+const (
+	maxDirectoryEntries = 500
+	maxSearchResults    = 200
+	maxSearchFiles      = 10000
+)
+
 type Registry struct {
-	ws *workspace.Workspace
+	ws                     *workspace.Workspace
+	allowProjectExecution  bool
+	allowFileOverwrite     bool
 }
 
-func New(ws *workspace.Workspace) *Registry {
-	return &Registry{ws: ws}
+func New(ws *workspace.Workspace, allowProjectExecution, allowFileOverwrite bool) *Registry {
+	return &Registry{ws: ws, allowProjectExecution: allowProjectExecution, allowFileOverwrite: allowFileOverwrite}
 }
 
 func str(description string) map[string]any {
@@ -36,36 +45,48 @@ func schema(props map[string]any, required ...string) map[string]any {
 }
 
 func (r *Registry) Specs() []nim.ToolSpec {
-	return []nim.ToolSpec{
+	specs := []nim.ToolSpec{
 		{Type: "function", Function: nim.ToolFunctionSpec{
-			Name: "list_files", Description: "List workspace files. Use . for root.",
+			Name: "inspect_project", Description: "Inspect project manifests and detect languages, frameworks, and likely test/build entry points without executing project code.",
+			Parameters: schema(map[string]any{}),
+		}},
+		{Type: "function", Function: nim.ToolFunctionSpec{
+			Name: "list_files", Description: "List entries in a workspace directory. Use . for root.",
 			Parameters: schema(map[string]any{"path": str("relative directory")}, "path"),
 		}},
 		{Type: "function", Function: nim.ToolFunctionSpec{
-			Name: "read_file", Description: "Read a text file inside workspace.",
+			Name: "search_files", Description: "Search text inside workspace files by case-insensitive substring. Skips dependency and build directories.",
+			Parameters: schema(map[string]any{"query": str("text to find")}, "query"),
+		}},
+		{Type: "function", Function: nim.ToolFunctionSpec{
+			Name: "read_file", Description: "Read a text file inside workspace (up to 1 MiB).",
 			Parameters: schema(map[string]any{"path": str("relative file path")}, "path"),
 		}},
 		{Type: "function", Function: nim.ToolFunctionSpec{
-			Name: "write_file", Description: "Create or replace a text file inside workspace.",
+			Name: "write_file", Description: "Create or replace a text file inside workspace. Replacing an existing file requires the user to enable --allow-overwrite.",
 			Parameters: schema(map[string]any{"path": str("relative path"), "content": str("complete file content")}, "path", "content"),
 		}},
 		{Type: "function", Function: nim.ToolFunctionSpec{
-			Name: "run_checks", Description: "Run go test ./..., go vet ./..., and go build ./.... No arbitrary commands.",
+			Name: "run_checks", Description: "Run safe static syntax checks for Python and JavaScript. Go tests/vet/build execute project code and require --allow-project-execution.",
 			Parameters: schema(map[string]any{}),
 		}},
 	}
+	return specs
 }
 
 func (r *Registry) Execute(ctx context.Context, name, args string) (string, error) {
 	var input map[string]any
 	if err := json.Unmarshal([]byte(args), &input); err != nil {
-		return "", err
+		return "", fmt.Errorf("invalid tool arguments: %w", err)
 	}
 	switch name {
+	case "inspect_project":
+		return r.inspectProject()
+
 	case "list_files":
 		path, _ := input["path"].(string)
-		if path == "" || path == "." {
-			path = "."
+		if path == "" {
+			return "", fmt.Errorf("path is required")
 		}
 		dir := r.ws.Root
 		if path != "." {
@@ -80,7 +101,11 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 			return "", err
 		}
 		var result []string
-		for _, entry := range entries {
+		for i, entry := range entries {
+			if i >= maxDirectoryEntries {
+				result = append(result, fmt.Sprintf("[truncated: showing first %d entries]", maxDirectoryEntries))
+				break
+			}
 			kind := "file"
 			if entry.IsDir() {
 				kind = "dir"
@@ -89,53 +114,291 @@ func (r *Registry) Execute(ctx context.Context, name, args string) (string, erro
 		}
 		return strings.Join(result, "\n"), nil
 
+	case "search_files":
+		query, _ := input["query"].(string)
+		if strings.TrimSpace(query) == "" {
+			return "", fmt.Errorf("query is required")
+		}
+		return r.searchFiles(ctx, query)
+
 	case "read_file":
 		path, _ := input["path"].(string)
-		value, err := r.ws.ReadFile(path)
-		if err != nil {
-			return "", err
+		if path == "" {
+			return "", fmt.Errorf("path is required")
 		}
-		if len(value) > 100000 {
-			value = value[:100000] + "\n[truncated]"
-		}
-		return value, nil
+		return r.ws.ReadFile(path)
 
 	case "write_file":
 		path, _ := input["path"].(string)
-		value, _ := input["content"].(string)
+		value, ok := input["content"].(string)
+		if path == "" || !ok {
+			return "", fmt.Errorf("path and string content are required")
+		}
+		resolved, err := r.ws.Resolve(path)
+		if err != nil {
+			return "", err
+		}
+		if _, err := os.Lstat(resolved); err == nil && !r.allowFileOverwrite {
+			return "", fmt.Errorf("refusing to replace existing file %q; rerun with --allow-overwrite to permit modifications", path)
+		} else if err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
 		if err := r.ws.WriteFile(path, value); err != nil {
 			return "", err
 		}
 		return "Wrote " + filepath.Clean(path), nil
 
 	case "run_checks":
-		var result strings.Builder
-		checks := [][]string{{"test", "./..."}, {"vet", "./..."}, {"build", "./..."}}
-		for _, args := range checks {
-			checkCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-			cmd := exec.CommandContext(checkCtx, "go", args...)
-			cmd.Dir = r.ws.Root
-			cmd.Env = safeGoEnv()
-			output := &limitedBuffer{max: 1 << 20}
-			cmd.Stdout = output
-			cmd.Stderr = output
-			err := cmd.Run()
-			timedOut := checkCtx.Err() == context.DeadlineExceeded
-			cancel()
-
-			fmt.Fprintf(&result, "$ go %s\n%s\n", strings.Join(args, " "), output.String())
-			if err != nil {
-				if timedOut {
-					return result.String(), fmt.Errorf("go %s timed out after 5 minutes", strings.Join(args, " "))
-				}
-				return result.String(), fmt.Errorf("go %s: %w", strings.Join(args, " "), err)
-			}
-		}
-		return result.String(), nil
+		return r.runChecks(ctx)
 
 	default:
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
+}
+
+func (r *Registry) inspectProject() (string, error) {
+	manifests := []string{
+		"go.mod", "go.work", "package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json",
+		"pyproject.toml", "requirements.txt", "Pipfile", "Cargo.toml", "pom.xml", "build.gradle",
+		"build.gradle.kts", "settings.gradle", "settings.gradle.kts", "*.sln", "*.csproj",
+		"CMakeLists.txt", "Makefile",
+	}
+	found := make([]string, 0)
+	languages := map[string]bool{}
+	err := filepath.WalkDir(r.ws.Root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(r.ws.Root, path)
+		if relErr != nil {
+			return relErr
+		}
+		if entry.IsDir() {
+			if path != r.ws.Root && ignoredDirectory(entry.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if rel == "." {
+			return nil
+		}
+		if len(found) >= 200 {
+			return filepath.SkipAll
+		}
+		name := entry.Name()
+		for _, manifest := range manifests {
+			matched, _ := filepath.Match(manifest, name)
+			if matched {
+				found = append(found, rel)
+				break
+			}
+		}
+		switch strings.ToLower(filepath.Ext(name)) {
+		case ".go":
+			languages["Go"] = true
+		case ".py":
+			languages["Python"] = true
+		case ".js", ".jsx", ".mjs", ".cjs":
+			languages["JavaScript"] = true
+		case ".ts", ".tsx":
+			languages["TypeScript"] = true
+		case ".java":
+			languages["Java"] = true
+		case ".kt", ".kts":
+			languages["Kotlin"] = true
+		case ".rs":
+			languages["Rust"] = true
+		case ".c", ".h", ".cc", ".cpp", ".hpp":
+			languages["C/C++"] = true
+		case ".cs":
+			languages["C#"] = true
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	sort.Strings(found)
+	var langNames []string
+	for name := range languages {
+		langNames = append(langNames, name)
+	}
+	sort.Strings(langNames)
+	if len(langNames) == 0 {
+		langNames = []string{"unknown"}
+	}
+	if len(found) == 0 {
+		found = []string{"(no known project manifest found)"}
+	}
+	return "Detected languages: " + strings.Join(langNames, ", ") + "\nProject manifests:\n- " + strings.Join(found, "\n- ") +
+		"\nDo not assume a framework or test command that is not supported by the detected files.", nil
+}
+
+func (r *Registry) searchFiles(ctx context.Context, query string) (string, error) {
+	query = strings.ToLower(query)
+	results := make([]string, 0)
+	visited := 0
+	err := filepath.WalkDir(r.ws.Root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if path != r.ws.Root && ignoredDirectory(entry.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		visited++
+		if visited > maxSearchFiles || len(results) >= maxSearchResults {
+			return filepath.SkipAll
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 {
+			return nil
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		data, readErr := os.ReadFile(path)
+		_ = file.Close()
+		if readErr != nil || bytes.IndexByte(data, 0) >= 0 {
+			return nil
+		}
+		rel, err := filepath.Rel(r.ws.Root, path)
+		if err != nil {
+			return nil
+		}
+		for lineNo, line := range strings.Split(string(data), "\n") {
+			if strings.Contains(strings.ToLower(line), query) {
+				results = append(results, fmt.Sprintf("%s:%d: %s", rel, lineNo+1, strings.TrimSpace(line)))
+				if len(results) >= maxSearchResults {
+					break
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(results) == 0 {
+		return fmt.Sprintf("No matches for %q (searched %d files).", query, visited), nil
+	}
+	if visited > maxSearchFiles || len(results) >= maxSearchResults {
+		results = append(results, "[results truncated]")
+	}
+	return strings.Join(results, "\n"), nil
+}
+
+func ignoredDirectory(name string) bool {
+	switch name {
+	case ".git", "node_modules", "vendor", ".venv", "venv", ".tox", ".gradle", "build", "dist", "target", "out":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Registry) runChecks(ctx context.Context) (string, error) {
+	var result strings.Builder
+	goMod := filepath.Join(r.ws.Root, "go.mod")
+	if _, err := os.Stat(goMod); err == nil {
+		if !r.allowProjectExecution {
+			return "", fmt.Errorf("Go tests/build can execute code from this project; rerun with --allow-project-execution to enable them")
+		}
+		checks := [][]string{{"test", "./..."}, {"vet", "./..."}, {"build", "./..."}}
+		for _, args := range checks {
+			output, err := runBounded(ctx, r.ws.Root, "go", args...)
+			fmt.Fprintf(&result, "$ go %s\n%s\n", strings.Join(args, " "), output)
+			if err != nil {
+				return result.String(), err
+			}
+		}
+		return result.String(), nil
+	}
+
+	pythonFiles, jsFiles := collectSourceFiles(r.ws.Root, map[string]bool{
+		".py": true, ".js": true, ".mjs": true, ".cjs": true,
+	})
+	if len(pythonFiles) > 0 {
+		script := "import ast,pathlib,sys; files=[pathlib.Path(p) for p in sys.argv[1:]]; [(ast.parse(p.read_text(encoding='utf-8'), filename=str(p))) for p in files]"
+		output, err := runBounded(ctx, r.ws.Root, "python3", append([]string{"-c", script}, pythonFiles...)...)
+		if err != nil {
+			output, err = runBounded(ctx, r.ws.Root, "python", append([]string{"-c", script}, pythonFiles...)...)
+		}
+		fmt.Fprintf(&result, "$ python syntax check (%d files)\n%s\n", len(pythonFiles), output)
+		if err != nil {
+			return result.String(), fmt.Errorf("Python syntax check failed or Python is unavailable: %w", err)
+		}
+	}
+	if len(jsFiles) > 0 {
+		for _, path := range jsFiles {
+			output, err := runBounded(ctx, r.ws.Root, "node", "--check", path)
+			fmt.Fprintf(&result, "$ node --check %s\n%s\n", path, output)
+			if err != nil {
+				return result.String(), fmt.Errorf("JavaScript syntax check failed or Node.js is unavailable: %w", err)
+			}
+		}
+	}
+	if len(pythonFiles) == 0 && len(jsFiles) == 0 {
+		return "No safe automatic checks are currently available for this project. inspect_project reports detected languages and manifests. Go execution checks require --allow-project-execution.", nil
+	}
+	return result.String(), nil
+}
+
+func collectSourceFiles(root string, extensions map[string]bool) ([]string, []string) {
+	var pythonFiles, jsFiles []string
+	_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if path != root && ignoredDirectory(entry.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info, err := entry.Info(); err == nil && info.Mode().IsRegular() && info.Size() <= 1<<20 {
+			ext := strings.ToLower(filepath.Ext(path))
+			if extensions[ext] {
+				rel, err := filepath.Rel(root, path)
+				if err == nil {
+					if ext == ".py" {
+						pythonFiles = append(pythonFiles, rel)
+					} else {
+						jsFiles = append(jsFiles, rel)
+					}
+				}
+			}
+		}
+		return nil
+	})
+	sort.Strings(pythonFiles)
+	sort.Strings(jsFiles)
+	return pythonFiles, jsFiles
+}
+
+func runBounded(ctx context.Context, dir, executable string, args ...string) (string, error) {
+	checkCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(checkCtx, executable, args...)
+	cmd.Dir = dir
+	cmd.Env = safeGoEnv()
+	output := &limitedBuffer{max: 1 << 20}
+	cmd.Stdout = output
+	cmd.Stderr = output
+	err := cmd.Run()
+	if checkCtx.Err() == context.DeadlineExceeded {
+		return output.String(), fmt.Errorf("%s timed out after 5 minutes", executable)
+	}
+	if err != nil {
+		return output.String(), fmt.Errorf("%s: %w", executable, err)
+	}
+	return output.String(), nil
 }
 
 type limitedBuffer struct {
@@ -148,7 +411,6 @@ type limitedBuffer struct {
 func (b *limitedBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
 	remaining := b.max - b.buf.Len()
 	if remaining > 0 {
 		n := len(p)
@@ -166,14 +428,12 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 func (b *limitedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
 	result := b.buf.String()
 	if b.truncated {
 		result += fmt.Sprintf("\n[output truncated at %d bytes]", b.max)
 	}
 	return result
 }
-
 
 func safeGoEnv() []string {
 	allowed := map[string]bool{
