@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"sort"
 	"strings"
 	"time"
 )
@@ -54,8 +55,11 @@ func NewClient(baseURL, apiKey, model string) *Client {
 		baseURL: strings.TrimRight(baseURL, "/"),
 		apiKey:  apiKey,
 		model:   model,
-		http: &http.Client{Timeout: 0, Transport: &http.Transport{
+		http: &http.Client{Timeout: 15 * time.Minute, Transport: &http.Transport{
 			ResponseHeaderTimeout: 90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			IdleConnTimeout:       90 * time.Second,
+			MaxIdleConnsPerHost:   4,
 		}},
 	}
 }
@@ -100,6 +104,9 @@ func (c *Client) Complete(ctx context.Context, messages []Message, tools []ToolS
 	if err != nil {
 		return Message{}, err
 	}
+	if len(body) > 16<<20 {
+		return Message{}, fmt.Errorf("NIM request exceeds the 16 MiB safety limit")
+	}
 
 	var resp *http.Response
 	for attempt := 0; attempt < maxRequestAttempts; attempt++ {
@@ -139,8 +146,15 @@ func (c *Client) Complete(ctx context.Context, messages []Message, tools []ToolS
 	}
 
 	if !strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+		data, err := io.ReadAll(io.LimitReader(resp.Body, (32<<20)+1))
+		if err != nil {
+			return Message{}, err
+		}
+		if len(data) > 32<<20 {
+			return Message{}, fmt.Errorf("NIM response exceeds the 32 MiB safety limit")
+		}
 		var value response
-		if err := json.NewDecoder(resp.Body).Decode(&value); err != nil {
+		if err := json.Unmarshal(data, &value); err != nil {
 			return Message{}, err
 		}
 		if len(value.Choices) == 0 {
@@ -158,7 +172,8 @@ func (c *Client) Complete(ctx context.Context, messages []Message, tools []ToolS
 
 	var out Message
 	calls := map[int]*ToolCall{}
-	scanner := bufio.NewScanner(resp.Body)
+	limited := &io.LimitedReader{R: resp.Body, N: (32 << 20) + 1}
+	scanner := bufio.NewScanner(limited)
 	scanner.Buffer(make([]byte, 65536), 4*1024*1024)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -202,10 +217,19 @@ func (c *Client) Complete(ctx context.Context, messages []Message, tools []ToolS
 	if err := scanner.Err(); err != nil {
 		return out, err
 	}
-	for i := 0; i < len(calls); i++ {
-		if call := calls[i]; call != nil {
-			out.ToolCalls = append(out.ToolCalls, *call)
-		}
+	if limited.N == 0 {
+		return out, fmt.Errorf("NIM stream exceeds the 32 MiB safety limit")
+	}
+	indices := make([]int, 0, len(calls))
+	for index := range calls {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	if len(indices) > 64 {
+		return out, fmt.Errorf("NIM response contains more than 64 tool calls")
+	}
+	for _, index := range indices {
+		out.ToolCalls = append(out.ToolCalls, *calls[index])
 	}
 	out.Role = "assistant"
 	if out.Content == "" && len(out.ToolCalls) == 0 {
