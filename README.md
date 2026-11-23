@@ -37,6 +37,7 @@ bash scripts/install-termux.sh
 The installer builds the CLI and installs it to `$PREFIX/bin/easycode`. Run `easycode --doctor` to check the local Go/Python/Node tools and NIM configuration without sending an API request. For a manual build:
 
 ```sh
+go mod tidy
 go build -trimpath -o easycode ./cmd/easycode
 ```
 
@@ -103,4 +104,4 @@ The CLI interaction and agent architecture are informed by the public OpenCode p
 
 ## Development status
 
-Alpha0.1 now includes the core Termux CLI workflow: NIM streaming/tool calls, project discovery, source search, guarded file writes, resumable named sessions, bounded context compaction, and verification-state tracking. Regression tests cover the main safety and recovery paths, but they still need to be executed on a machine with GitHub access. After changes, EasyCodeAI requires a successful supported check or records that no safe checker is available before accepting completion. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), session listing/deletion, richer tool cards and approval prompts, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
+Alpha0.1 now includes the core Termux CLI workflow: NIM streaming/tool calls, project discovery, source search, guarded file writes, resumable named sessions, bounded context compaction, and verification-state tracking. Regression tests cover the main safety and recovery paths; GitHub Actions runs the race-enabled test suite, vet, and build checks on each branch update. After changes, EasyCodeAI requires a successful supported check or records that no safe checker is available before accepting completion. Remaining work includes deeper TypeScript/Java/Kotlin/Rust/C/C++/.NET checks, stronger filesystem race resistance (the current path checks cannot eliminate all filesystem TOCTOU races), session listing/deletion, richer tool cards and approval prompts, and queue telemetry/adaptive scheduling based on measured NIM behavior. CI is configured for race-enabled tests, vet, and build; a passing run has not yet been independently verified.
